@@ -19,13 +19,180 @@
 
 \title{Approximating matrices with multiple symmetries: with an application to quantum chemistry}
 \author{Joseph Vokt, Senior, Computer Science\\jpv52@cornell.edu\\Joint-work with \\Professor Charles Van Loan, Computer Science\\cv@cs.cornell.edu}
-\date{\today}
+\date{}
 \hypersetup{
   pdfkeywords={},
   pdfsubject={},
   pdfcreator={Emacs Org-mode version 7.9.3f}}
 
-\usetheme{Copenhagen}\usecolortheme{default}\definecolor{color17}{rgb}{.8,0.0,1}\setbeamertemplate{footline}[page number]{}\setbeamertemplate{navigation symbols}{}\definecolor{dark_green}{rgb}{0.0, 0.6, 0.0}\input{TensorCommands}
+\usetheme{Copenhagen}\usecolortheme{default}\definecolor{color17}{rgb}{.8,0.0,1}\setbeamertemplate{footline}[page number]{}\setbeamertemplate{navigation symbols}{}\definecolor{dark_green}{rgb}{0.0, 0.6, 0.0}
+
+%\addtolength{\hoffset}{-1cm}
+%\addtolength{\textwidth}{0cm}
+%\DeclareMathOperator{\diag}{diag}
+%\DeclareMathOperator{\re}{re}
+%\DeclareMathOperator{\tr}{tr}
+%\DeclareMathOperator{\vvec}{vec}
+%\DeclareMathOperator{\argmin}{argmin}
+%\DeclareMathOperator{\blvec}{\mathbf{BlockVec}}
+
+\newcommand{\BlockVec}[1]{\mbox{{\bf BlockVec}($#1$)}}
+
+\newcommand{\BlockMat}[1]{\mbox{{\bf BlockMat}($#1$)}}
+
+\newcommand{\sym}[1]{\mbox{{\bf sym}($#1$)}}
+
+\newcommand{\sgn}[1]{\mbox{{\rm sgn}($#1$)}}
+
+\newcommand{\oprank}[1]{\mbox{{\rm rank}$_{\circledcirc}${\rm ($#1$)}}}
+
+\newcommand{\mlrank}[1]{\mbox{{\rm rank}$_{\boxplus}${\rm ($#1$)}}}
+
+\newcommand{\krank}[1]{\mbox{{\rm rank}$_{\otimes}${\rm ($#1$)}}}
+
+
+% My new commands.
+
+
+%
+% Fancy C and R fonts.
+%
+\newdimen\pHeight
+\pHeight=-32678sp
+\newdimen\pLower
+%\pLower=-4096sp
+\newdimen\pLineWidth
+%\pLineWidth=32678sp
+\newdimen\pKern
+\pKern=-276480sp
+\newdimen\pIR
+\pIR=-131072sp
+\newsavebox{\Cbox}
+\newsavebox{\vertCmplx}
+\newdimen\Cheight
+\newdimen\Cwidth
+\sbox{\Cbox}{\rm C}
+%\Cheight=\ht\Cbox
+%\Cwidth=\wd\Cbox
+%\advance\Cheight by \pHeight
+\sbox{\vertCmplx}{\rule[\pLower]{\pLineWidth}{\Cheight}}
+\sbox{\Cbox}{\usebox{\Cbox}\kern\pKern\usebox{\vertCmplx}}
+\wd\Cbox=\Cwidth
+\def\C{\usebox{\Cbox}}
+\def\R{{\rm I\kern\pIR R}}
+
+% colon fixup
+\mathcode `:="003A
+%
+
+
+
+%
+%  Belonging to vector spaces
+%
+
+\newcommand{\ins}[1]{\mbox{${#1} \in \R    $}} 
+
+\newcommand{\inv}[2]{\mbox{${#1} \in
+\R^{\hspace*{-.01in} #2}$}}  
+
+\newcommand{\inm}[3]
+   {\mbox{${#1} \in \R^{\hspace*{-.015in}{#2} \times
+{#3}}\hspace*{-.05in}$ }} 
+
+\newcommand{\inM}[5]
+{
+\mbox{${#1} \in \R_{#2\times #3}^{#4\times#5}$}
+}
+
+\newcommand{\inT}[5]
+   {\mbox{${\cal #1} \in \R^{\hspace*{-.015in}{#2} \times
+{#3} \times {#4} \times {#5}}\hspace*{-.05in}$ }} 
+
+\newcommand{\inTens}[4]
+   {\mbox{${\cal #1}_{#2} \in \R^{\hspace*{-.015in}{#3} \times \cdots \times {#4}} \hspace*{-.05in}$ }} 
+
+
+\newcommand{\rearr}[5]
+{
+\mbox{${\mathbf{T}}_{#2\times#3}^{#4\times#5}(#1)$}
+}
+
+\newcommand{\RN}[1]{\mbox{$\R^{\hspace*{-.01in}#1}$}}
+\newcommand{\RMN}[2]{\mbox{$\R^{\hspace*{-.015in}{#1}\times {#2}}$}}
+\newcommand{\CN}[1]{\mbox{$\C^{\hspace*{-.01in}#1}$}}
+\newcommand{\Cins}[1]{ \mbox{${#1} \in \C  $}} 
+\newcommand{\Cinv}[2]{ \mbox{${#1} \in \C^{\hspace*{-.005in}#2}$}} 
+\newcommand{\Cinm}[3] {\mbox{${#1} \in \C^{\hspace*{-.005in}{#2} \times {#3}}\hspace*{-.005in}$}} 
+%
+%
+%-----------------
+%  2-norm
+%
+\newcommand{\nrm}[1]{\mbox{$\|\: #1 \: \|_{2}$}}
+\newcommand{\norm}[1]{\mbox{$\|\: #1 \: \|$}}
+\newcommand{\normi}[1]{\mbox{$\|\: #1 \: \|_{\infty}$}}
+
+%  2-norm squared
+%
+\newcommand{\nrms}[1]{\mbox{$\| \: #1  \: \|_{2}^{2} $ }  }
+%
+%
+% -----------------
+%
+%  Condition
+%
+\newcommand{\cond}[2]{\mbox{$\kappa_{#2}( #1 )$}}
+\newcommand{\condi}[1]{\mbox{$\kappa_{\infty}(#1)$}}
+%
+
+\newcommand{\fl}{\mbox{fl}}
+
+
+\newcommand{\RR} { \mathbb{R} }   % Field of real numbers
+\newcommand{\ZZ} { \mathbb{Z} }   % Integers
+\newcommand{\OO} { \mathcal{O} }  % Big-O notation
+\newcommand{\EE} { \mathcal{E} }  % script E
+
+
+\newcommand{\abs}[1]   { \left| #1 \right| }
+\newcommand{\myvec}    { \mathrm{vec} }
+
+\newcommand{\myln}     { \mathrm{ln} }
+\newcommand{\myceil}   { \mathrm{ceil} }
+\newcommand{\half}     { \frac{1}{2} }
+\newcommand{\kron}     { \otimes }
+\newcommand{\bul}      { $\bullet$ }
+\newcommand{\tils}     { \tilde{s} }
+\newcommand{\tilx}     { \tilde{x} }
+\newcommand{\Btil}     { \tilde{B} }
+\newcommand{\Dhat}     { \hat{D} }
+
+\newcommand{\myskip}   { \medskip }
+%\newcommand{\myskip} { \vspace{\baselineskip} }
+
+\newcommand{\Matlab} {\mbox{\sc Matlab}}
+
+
+\newcommand{\ZZdp} {\ZZ^{\hspace*{-.01in} d}_p}
+\newcommand{\ZZdn} {\ZZ^{\hspace*{-.01in} d}_n}
+
+\newcommand{\bvp}{
+\mbox{$\:\otimes \hspace*{-3.92pt} \rule[-.7pt]{.23pt}{6.5pt} 
+        \hspace*{-3.45pt} \rule[2.4pt]{6.56pt}{.23pt}\:$} }
+
+\newcommand{\T}{\raisebox{1pt}{$ \:\otimes \:$}}
+
+
+%\newcommand{\vec}[1]{\mbox{vec($ #1 $)}}
+% colon fixup 
+\mathcode `:="003A
+
+\newenvironment{code}{\begin{tabbing}\hspace*{.3in} \=
+\hspace*{.3in} \= \hspace*{.3in} \= \hspace*{.3in} \=
+\hspace*{.3in} \= \hspace*{.3in} \= \kill }{\end{tabbing}}
+
+
 \begin{document}
 
 \maketitle
@@ -96,7 +263,7 @@
 \frametitle{ERI Tensor Symmetry: Problem Statement}
 \label{sec-1-4}
 
-Compute $\mu$, the coulomb energy
+Compute $\mu$, the molecular orbital integral transformation
 \begin{align*}
 \mu &= \sum_{i=1}^{n}  \sum_{j=1}^{n}  \sum_{k=1}^{n}  \sum_{\ell=1}^{n}
 {\cal A}(i,j,k,\ell) v_{i}v_{j}v_{k}v_{\ell}\\
@@ -371,7 +538,9 @@ A=\mathcal{A}_{[1, 3]\times[2, 4]}
 \colorbox{cyan}{21} &  \colorbox{cyan}{24} &  \colorbox{cyan}{27} &  \colorbox{green}{39} &  \colorbox{green}{42} &  \colorbox{green}{45} &  \colorbox{color17}{48} &  \colorbox{color17}{51} &  \colorbox{color17}{54} \\
 \end{array}
 \end{itemize} % ends low level
+
 \end{frame}
+
 \begin{frame}
 \frametitle{ERI Tensor Symmetry: Block Structure}
 \label{sec-1-18}
@@ -555,7 +724,7 @@ A&= Q \left[ \begin{array}{cc} A_{\mbox{\tiny sym}} & 0 \\ 0 & A_{\mbox{\tiny sk
 \end{itemize} % ends low level
 \end{frame}
 \begin{frame}
-\frametitle{ERI Tensor Symmetry: Energy calculation}
+\frametitle{ERI Tensor Symmetry: Integral transformation}
 \label{sec-1-25}
 
 \begin{align*}
@@ -569,7 +738,7 @@ A&= Q \left[ \begin{array}{cc} A_{\mbox{\tiny sym}} & 0 \\ 0 & A_{\mbox{\tiny sk
 \end{align*}
 \end{frame}
 \begin{frame}
-\frametitle{ERI Tensor Symmetry: Energy calculation}
+\frametitle{ERI Tensor Symmetry: Integral transformation}
 \label{sec-1-26}
 \begin{itemize}
 
@@ -591,14 +760,14 @@ A&= Q \left[ \begin{array}{cc} A_{\mbox{\tiny sym}} & 0 \\ 0 & A_{\mbox{\tiny sk
 \label{sec-1-27}
 \begin{itemize}
 
-\item EnergyCalculation
+\item IntegralTransformation
 \label{sec-1-27-1}%
 \begin{itemize}
 
 \item Calls StructLDLT on the tensor unfolding
 \label{sec-1-27-1-1}%
 
-\item Does the energy calculation
+\item Does the integral transformation
 \label{sec-1-27-1-2}%
 \end{itemize} % ends low level
 
@@ -752,7 +921,7 @@ v_5 & v_6 & v_3\end{array}\right]
 \label{sec-1-31-2}%
 \begin{itemize}
 
-\item $O(r^2n^2)$ algorithm for computing ERI energy
+\item $O(r^2n^2)$ algorithm for computing computing a molecular integral transformation
 \label{sec-1-31-2-1}%
 \end{itemize} % ends low level
 \end{itemize} % ends low level
