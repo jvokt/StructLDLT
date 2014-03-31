@@ -1,7 +1,7 @@
 StructLDLT: Approximating matrices with multiple symmetries
 =========
 
-This git repo contains the slides and Matlab code explaining StructLDLT.
+This git repo contains the slides and Matlab and Julia code explaining StructLDLT.
 
 Abstract
 
