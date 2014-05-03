@@ -61,7 +61,7 @@ function TestIntegralTransformation()
         println("Structured transformation error: ",struct_trans_error[i])
     end
     
-    if false
+    if true
         plotComparison(num_basis_fns[1:nmols],full_fact_time,"Full factorization",struct_fact_time,"Structured factorization","Number of basis functions","Time (seconds)","Time to factorize")
         plotComparison(num_basis_fns[1:nmols],full_fact_space,"Full factorization",struct_fact_space,"Structured factorization","Number of basis functions","Space (in Float64s)","Space to factorize")
         plotComparison(num_basis_fns[1:nmols],full_fact_error,"Full factorization",struct_fact_error,"Structured factorization","Number of basis functions","Error (1-norm)","Error to factorize")
