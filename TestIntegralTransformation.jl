@@ -5,7 +5,7 @@ function TestIntegralTransformation()
     molecules = ["HF","NH3","H2O2","N2H4","C2H5OH"]
     num_basis_fns = [34, 48, 68, 82, 123]
     ranks = [200, 300, 400, 500, 750]
-    nmols =  length(num_basis_fns)
+    nmols = 1# length(num_basis_fns)
     tol = 1e-6
     
     full_fact_time = zeros(nmols)
