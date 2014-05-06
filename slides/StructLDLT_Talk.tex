@@ -1,0 +1,964 @@
+% Created 2013-11-08 Fri 13:29
+\documentclass[bigger]{beamer}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{fixltx2e}
+\usepackage{graphicx}
+\usepackage{longtable}
+\usepackage{float}
+\usepackage{wrapfig}
+\usepackage{soul}
+\usepackage{textcomp}
+\usepackage{marvosym}
+\usepackage{wasysym}
+\usepackage{latexsym}
+\usepackage{amssymb}
+\usepackage{hyperref}
+\tolerance=1000
+\providecommand{\alert}[1]{\textbf{#1}}
+
+\title{Approximating matrices with multiple symmetries: with an application to quantum chemistry}
+\author{Joseph Vokt, Senior, Computer Science\\jpv52@cornell.edu\\Joint-work with \\Professor Charles Van Loan, Computer Science\\cv@cs.cornell.edu}
+\date{}
+\hypersetup{
+  pdfkeywords={},
+  pdfsubject={},
+  pdfcreator={Emacs Org-mode version 7.9.3f}}
+
+\usetheme{Copenhagen}\usecolortheme{default}\definecolor{color17}{rgb}{.8,0.0,1}\setbeamertemplate{footline}[page number]{}\setbeamertemplate{navigation symbols}{}\definecolor{dark_green}{rgb}{0.0, 0.6, 0.0}
+
+%\addtolength{\hoffset}{-1cm}
+%\addtolength{\textwidth}{0cm}
+%\DeclareMathOperator{\diag}{diag}
+%\DeclareMathOperator{\re}{re}
+%\DeclareMathOperator{\tr}{tr}
+%\DeclareMathOperator{\vvec}{vec}
+%\DeclareMathOperator{\argmin}{argmin}
+%\DeclareMathOperator{\blvec}{\mathbf{BlockVec}}
+
+\newcommand{\BlockVec}[1]{\mbox{{\bf BlockVec}($#1$)}}
+
+\newcommand{\BlockMat}[1]{\mbox{{\bf BlockMat}($#1$)}}
+
+\newcommand{\sym}[1]{\mbox{{\bf sym}($#1$)}}
+
+\newcommand{\sgn}[1]{\mbox{{\rm sgn}($#1$)}}
+
+\newcommand{\oprank}[1]{\mbox{{\rm rank}$_{\circledcirc}${\rm ($#1$)}}}
+
+\newcommand{\mlrank}[1]{\mbox{{\rm rank}$_{\boxplus}${\rm ($#1$)}}}
+
+\newcommand{\krank}[1]{\mbox{{\rm rank}$_{\otimes}${\rm ($#1$)}}}
+
+
+% My new commands.
+
+
+%
+% Fancy C and R fonts.
+%
+\newdimen\pHeight
+\pHeight=-32678sp
+\newdimen\pLower
+%\pLower=-4096sp
+\newdimen\pLineWidth
+%\pLineWidth=32678sp
+\newdimen\pKern
+\pKern=-276480sp
+\newdimen\pIR
+\pIR=-131072sp
+\newsavebox{\Cbox}
+\newsavebox{\vertCmplx}
+\newdimen\Cheight
+\newdimen\Cwidth
+\sbox{\Cbox}{\rm C}
+%\Cheight=\ht\Cbox
+%\Cwidth=\wd\Cbox
+%\advance\Cheight by \pHeight
+\sbox{\vertCmplx}{\rule[\pLower]{\pLineWidth}{\Cheight}}
+\sbox{\Cbox}{\usebox{\Cbox}\kern\pKern\usebox{\vertCmplx}}
+\wd\Cbox=\Cwidth
+\def\C{\usebox{\Cbox}}
+\def\R{{\rm I\kern\pIR R}}
+
+% colon fixup
+\mathcode `:="003A
+%
+
+
+
+%
+%  Belonging to vector spaces
+%
+
+\newcommand{\ins}[1]{\mbox{${#1} \in \R    $}} 
+
+\newcommand{\inv}[2]{\mbox{${#1} \in
+\R^{\hspace*{-.01in} #2}$}}  
+
+\newcommand{\inm}[3]
+   {\mbox{${#1} \in \R^{\hspace*{-.015in}{#2} \times
+{#3}}\hspace*{-.05in}$ }} 
+
+\newcommand{\inM}[5]
+{
+\mbox{${#1} \in \R_{#2\times #3}^{#4\times#5}$}
+}
+
+\newcommand{\inT}[5]
+   {\mbox{${\cal #1} \in \R^{\hspace*{-.015in}{#2} \times
+{#3} \times {#4} \times {#5}}\hspace*{-.05in}$ }} 
+
+\newcommand{\inTens}[4]
+   {\mbox{${\cal #1}_{#2} \in \R^{\hspace*{-.015in}{#3} \times \cdots \times {#4}} \hspace*{-.05in}$ }} 
+
+
+\newcommand{\rearr}[5]
+{
+\mbox{${\mathbf{T}}_{#2\times#3}^{#4\times#5}(#1)$}
+}
+
+\newcommand{\RN}[1]{\mbox{$\R^{\hspace*{-.01in}#1}$}}
+\newcommand{\RMN}[2]{\mbox{$\R^{\hspace*{-.015in}{#1}\times {#2}}$}}
+\newcommand{\CN}[1]{\mbox{$\C^{\hspace*{-.01in}#1}$}}
+\newcommand{\Cins}[1]{ \mbox{${#1} \in \C  $}} 
+\newcommand{\Cinv}[2]{ \mbox{${#1} \in \C^{\hspace*{-.005in}#2}$}} 
+\newcommand{\Cinm}[3] {\mbox{${#1} \in \C^{\hspace*{-.005in}{#2} \times {#3}}\hspace*{-.005in}$}} 
+%
+%
+%-----------------
+%  2-norm
+%
+\newcommand{\nrm}[1]{\mbox{$\|\: #1 \: \|_{2}$}}
+\newcommand{\norm}[1]{\mbox{$\|\: #1 \: \|$}}
+\newcommand{\normi}[1]{\mbox{$\|\: #1 \: \|_{\infty}$}}
+
+%  2-norm squared
+%
+\newcommand{\nrms}[1]{\mbox{$\| \: #1  \: \|_{2}^{2} $ }  }
+%
+%
+% -----------------
+%
+%  Condition
+%
+\newcommand{\cond}[2]{\mbox{$\kappa_{#2}( #1 )$}}
+\newcommand{\condi}[1]{\mbox{$\kappa_{\infty}(#1)$}}
+%
+
+\newcommand{\fl}{\mbox{fl}}
+
+
+\newcommand{\RR} { \mathbb{R} }   % Field of real numbers
+\newcommand{\ZZ} { \mathbb{Z} }   % Integers
+\newcommand{\OO} { \mathcal{O} }  % Big-O notation
+\newcommand{\EE} { \mathcal{E} }  % script E
+
+
+\newcommand{\abs}[1]   { \left| #1 \right| }
+\newcommand{\myvec}    { \mathrm{vec} }
+
+\newcommand{\myln}     { \mathrm{ln} }
+\newcommand{\myceil}   { \mathrm{ceil} }
+\newcommand{\half}     { \frac{1}{2} }
+\newcommand{\kron}     { \otimes }
+\newcommand{\bul}      { $\bullet$ }
+\newcommand{\tils}     { \tilde{s} }
+\newcommand{\tilx}     { \tilde{x} }
+\newcommand{\Btil}     { \tilde{B} }
+\newcommand{\Dhat}     { \hat{D} }
+
+\newcommand{\myskip}   { \medskip }
+%\newcommand{\myskip} { \vspace{\baselineskip} }
+
+\newcommand{\Matlab} {\mbox{\sc Matlab}}
+
+
+\newcommand{\ZZdp} {\ZZ^{\hspace*{-.01in} d}_p}
+\newcommand{\ZZdn} {\ZZ^{\hspace*{-.01in} d}_n}
+
+\newcommand{\bvp}{
+\mbox{$\:\otimes \hspace*{-3.92pt} \rule[-.7pt]{.23pt}{6.5pt} 
+        \hspace*{-3.45pt} \rule[2.4pt]{6.56pt}{.23pt}\:$} }
+
+\newcommand{\T}{\raisebox{1pt}{$ \:\otimes \:$}}
+
+
+%\newcommand{\vec}[1]{\mbox{vec($ #1 $)}}
+% colon fixup 
+\mathcode `:="003A
+
+\newenvironment{code}{\begin{tabbing}\hspace*{.3in} \=
+\hspace*{.3in} \= \hspace*{.3in} \= \hspace*{.3in} \=
+\hspace*{.3in} \= \hspace*{.3in} \= \kill }{\end{tabbing}}
+
+
+\begin{document}
+
+\maketitle
+
+
+
+\section{}
+\begin{frame}
+\frametitle{Themes for this talk}
+\label{sec-1-1}
+\begin{itemize}
+
+\item Symmetry
+\label{sec-1-1-1}%
+
+\item Low-rank approximation
+\label{sec-1-1-2}%
+
+\item Preserving symmetry for low-rank approximation
+\label{sec-1-1-3}%
+
+\item Bridging the gap from matrix to tensor
+\label{sec-1-1-4}%
+\end{itemize} % ends low level
+\end{frame}
+\begin{frame}
+\frametitle{ERI Tensor Symmetry: Background}
+\label{sec-1-2}
+\begin{itemize}
+
+\item The electron repulsion integral (ERI) tensor is defined by
+\label{sec-1-2-1}%
+\begin{align*}
+&{\cal A}(i,j,k,\ell)
+=\int d\textbf{x}_1d\textbf{x}_2 \chi_i(\textbf{x}_1)^*\chi_j(\textbf{x}_1)\frac{1}{r_{12}} \chi_k(\textbf{x}_2)^*\chi_{\ell}(\textbf{x}_2)
+\end{align*}
+
+\item $\chi(\textbf{x})$ is a molecular orbital that describes an electron's motion at coordinate $\textbf{x}=(r,\theta,\phi,\omega)$ where $\omega$ is the spin coordinate
+\label{sec-1-2-2}%
+
+\item This tensor describes two-body Coulomb interaction in molecular electronic structure theory
+\label{sec-1-2-3}%
+
+\item Source: Szabo and Ostlund's \emph{Modern Quantum Chemistry}
+\label{sec-1-2-4}%
+\end{itemize} % ends low level
+\end{frame}
+\begin{frame}
+\frametitle{ERI Tensor Symmetry: Background}
+\label{sec-1-3}
+\begin{itemize}
+
+\item For real orbitals, we have the following symmetries:
+\label{sec-1-3-1}%
+\begin{align*}
+&{\cal A}(i,j,k,\ell) = {\cal A}(k,\ell,i,j) = {\cal A}(j,i,\ell,k) = {\cal A}(\ell,k,j,i)\\
+&={\cal A}(j,i,k,\ell) = {\cal A}(\ell,k,i,j) = {\cal A}(i,j,\ell,k) = {\cal A}(k,\ell,j,i)
+\end{align*}
+
+\item For our purposes, we will be primarily concerned with
+\label{sec-1-3-2}%
+\begin{equation*}
+{\cal A}(i,j,k,\ell) = {\cal A}(j,i,k,\ell) = {\cal A}(i,j,\ell,k) = {\cal A}(k,\ell,i,j)
+\end{equation*}
+\end{itemize} % ends low level
+\end{frame}
+\begin{frame}
+\frametitle{ERI Tensor Symmetry: Problem Statement}
+\label{sec-1-4}
+
+Compute $\mu$, the molecular orbital integral transformation
+\begin{align*}
+\mu &= \sum_{i=1}^{n}  \sum_{j=1}^{n}  \sum_{k=1}^{n}  \sum_{\ell=1}^{n}
+{\cal A}(i,j,k,\ell) v_{i}v_{j}v_{k}v_{\ell}\\
+&= (v\kron v)^{T} A (v \kron v)
+\end{align*}
+where \inv{v}{n} and \inv{\cal A}{n\times n \times n \times n} is the fourth-order ERI tensor and $A$ is the tensor unfolding.
+\end{frame}
+\begin{frame}
+\frametitle{ERI Tensor Symmetry: Motivation}
+\label{sec-1-5}
+\begin{itemize}
+
+\item Applications of ERI tensors
+\label{sec-1-5-1}%
+\begin{itemize}
+
+\item \emph{Ab initio} protein folding simulation
+\label{sec-1-5-1-1}%
+
+\item Rational therapeutic drug design
+\label{sec-1-5-1-2}%
+
+\item Engineering nano-scale devices
+\label{sec-1-5-1-3}%
+\end{itemize} % ends low level
+
+\item The more electrons, the higher the dimensionality $d$
+\label{sec-1-5-2}%
+\begin{itemize}
+
+\item $d$-body problem at the heart of quantum chemistry
+\label{sec-1-5-2-1}%
+\end{itemize} % ends low level
+\end{itemize} % ends low level
+\end{frame}
+\begin{frame}
+\frametitle{ERI Tensor Symmetry: Goal}
+\label{sec-1-6}
+\begin{itemize}
+
+\item Goal: a low-rank approximation which preserves the original structure \emph{without} using the SVD, while minimizing ERI evaluations
+\label{sec-1-6-1}%
+\begin{itemize}
+
+\item Why low-rank?
+\label{sec-1-6-1-1}%
+\begin{itemize}
+
+\item Data sparsity
+\label{sec-1-6-1-1-1}%
+\end{itemize} % ends low level
+
+\item Why preserve structure?
+\label{sec-1-6-1-2}%
+\begin{itemize}
+
+\item Numerical motivation: good to maintain data sparsity
+\label{sec-1-6-1-2-1}%
+
+\item Physical motivation: must not violate the Pauli principle
+\label{sec-1-6-1-2-2}%
+\end{itemize} % ends low level
+
+\item Why not use the SVD?
+\label{sec-1-6-1-3}%
+\begin{itemize}
+
+\item The SVD of an $n^2xn^2$ matrix takes $O(n^6)$ flops
+\label{sec-1-6-1-3-1}%
+\end{itemize} % ends low level
+
+\item Why minimize ERI evaluations?
+\label{sec-1-6-1-4}%
+\begin{itemize}
+
+\item ERI evaluations are expensive to compute
+\label{sec-1-6-1-4-1}%
+\end{itemize} % ends low level
+\end{itemize} % ends low level
+\end{itemize} % ends low level
+\end{frame}
+\begin{frame}
+\frametitle{Centrosymmetry: A tale of two symmetries}
+\label{sec-1-7}
+
+A persymmetric matrix is symmetric about its antidiagonal:
+\[
+A \:=\: 
+\left[ 
+\begin{array}{cccc}
+1 & 2 & 3 & \colorbox{red}{4}\\
+5 & 6 & \colorbox{red}{7} & 3 \\
+8 & \colorbox{red}{9} & 6 & 2 \\
+\colorbox{red}{10} & 8 & 5 & 1
+\end{array} 
+\right].
+\]
+\end{frame}
+\begin{frame}
+\frametitle{Centrosymmetry: A tale of two symmetries}
+\label{sec-1-8}
+
+A matrix \inm{A}{n}{n} is persymmetric if  $A^{T} = E_{n}AE_{n}$ where \inm{E_{n}}{n}{n} is
+the $n$-by-$n$ exchange permutation, e.g.,
+\[
+E_{4} \:=\: 
+\left[ 
+\begin{array}{cccc} 
+0 & 0 & 0 & 1\\
+0 & 0 & 1 & 0 \\
+0 & 1 & 0 & 0 \\
+1 & 0 & 0 & 0
+\end{array} 
+\right].
+\]
+\end{frame}
+\begin{frame}
+\frametitle{Centrosymmetry: A tale of two symmetries}
+\label{sec-1-9}
+
+A centrosymmetric matrix is a symmetric persymmetric matrix $A = E_{n}AE_{n}$ e.g.,
+\[
+A \:=\: 
+\left[ 
+\begin{array}{cccc} 
+1 & 2 & \colorbox{green}{3} & 4\\
+2 & 5 & 6 & \colorbox{green}{3} \\
+\colorbox{green}{3} & 6 & 5 & 2 \\
+4 & \colorbox{green}{3} & 2 & 1
+\end{array} 
+\right]
+\]
+\end{frame}
+\begin{frame}
+\frametitle{Centrosymmetry: Block Structure}
+\label{sec-1-10}
+
+If \inm{A}{n}{n} is blocked as
+\[A \:=\: \left[ \begin{array}{cc} A_{11} & A_{12} \\ A_{21} & A_{22} \end{array} \right]
+\qquad \inm{A_{ij}}{m}{m}\]
+and $A$ is centrosymmetric, where $n$ is even, then \[A \:= \: \left[ \begin{array}{cc} A_{11} & A_{12} \\ E_{m}A_{12}E_{m} & E_{m}A_{11}E_{m}
+\end{array} \right]\]
+\end{frame}
+\begin{frame}
+\frametitle{Centrosymmetry: Block Diagonalization}
+\label{sec-1-11}
+
+If we define $Q_E$ as
+\[Q_{E} \:=\: \frac{1}{\sqrt{2}} 
+\left[ \begin{array}{c|c} I_{m} & I_{m} \\ E_{m} & -E_{m} \end{array} \right]
+\:=\: \left[ \begin{array}{c|c} Q_{+} & Q_{-} \end{array} \right]\]
+then $Q_{E}$ is orthogonal and
+\[Q_{E}^{T} A Q_{E} \:=\: 
+\left[ \begin{array}{cc} A_{11} + A_{12}E_{m} & 0 \\ 0 & A_{11}-A_{12}E_{m} \end{array} \right]\]
+is the block diagonalization of A.
+\end{frame}
+\begin{frame}
+\frametitle{Centrosymmetry: Block Factorizations}
+\label{sec-1-12}
+\begin{itemize}
+
+\item When $A$ is positive definite, diagonal blocks are too
+\label{sec-1-12-1}%
+
+\item Stable $LDL^{T}$ factorizations:\\
+\label{sec-1-12-2}%
+\[P_{+}(A_{11}+A_{12}E_{m})P_{+}^{T}  =  L_{+}D_{+}L_{+}^{T}\]\[P_{-}(A_{11}-A_{12}E_{m})P_{-}^{T}  =  L_{-}D_{-}L_{-}^{T}\]
+
+
+\item Obtaining both factorizations takes $2(\frac{1}{3}(\frac{n}{2})^3)=\frac{1}{4}(\frac{n^3}{3})$ flops
+\label{sec-1-12-3}%
+
+\item Centrosymmetric $A$ lets you solve $Ax=b$ in $\frac{1}{4}$ of the work as compared to non-symmetric $A$
+\label{sec-1-12-4}%
+\end{itemize} % ends low level
+\end{frame}
+\begin{frame}
+\frametitle{Centrosymmetry: Low-rank approximation}
+\label{sec-1-13}
+
+Let
+\[
+Y_{+} \:=\: Q_{+}P_{+}^{T}L_{+} \:=\: [ \:y^{(1)}_{+} \:| \: \cdots \:|\:y_{+}^{(m_+)} \:]
+\]
+and
+\[
+Y_{-} \:=\: Q_{-}P_{-}^{T}L_{-} \:=\: [ \:y^{(1)}_{-} \:| \: \cdots \:|\:y_{-}^{(m_-)} \:]
+\]
+\end{frame}
+\begin{frame}
+\frametitle{Centrosymmetry: Low-rank approximation}
+\label{sec-1-14}
+
+\begin{eqnarray*}
+A&=& Q_{E} \left[ \begin{array}{cc} A_{11} + A_{12}E_{m} & 0 \\ 0 & A_{11}-A_{12}E_{m} \end{array} \right] Q_{E}^{T}\\
+&=&  Q_{+}(A_{11}+A_{12}E_{m}) Q_{+}^{T} \:+\: Q_{-}(A_{11}-A_{12}E_{m}) Q_{-}^{T}\\
+&=& Y_{+}D_{+} Y_{+}^{T} \:+\: Y_{-}D_{-} Y_{-}^{T}\\
+&=& \sum_{k=1}^{m_{+}} d_{+}^{(k)} y_{+}^{(k)}[y_{+}^{(k)}]^{T} \;+\;
+    \sum_{k=1}^{m_{-}} d_{-}^{(k)} y_{-}^{(k)}[y_{-}^{(k)}]^{T}
+\end{eqnarray*}
+\begin{itemize}
+
+\item By terminating these sums early, we obtain low rank approximations that are also centrosymmetric.
+\label{sec-1-14-1}%
+\end{itemize} % ends low level
+\end{frame}
+\begin{frame}
+\frametitle{ERI Tensor Symmetry: Block Structure}
+\label{sec-1-15}
+\begin{itemize}
+
+\item Unfold ${\cal A}(i,j,k,\ell)$ as $[A_{k,\ell}]_{i,j}$
+\label{sec-1-15-1}%
+\begin{equation*}
+A=\mathcal{A}_{[1, 3]\times[2, 4]}
+\end{equation*}
+
+\item ${\cal A}(i,j,k,\ell)$ is the $(i,j)$ entry of the $(k,\ell)$ block of $A$
+\label{sec-1-15-2}%
+
+\item Assume $n=3$ for the following examples
+\label{sec-1-15-3}%
+\end{itemize} % ends low level
+\end{frame}
+\begin{frame}
+\frametitle{ERI Tensor Symmetry: Block Structure}
+\label{sec-1-16}
+\begin{itemize}
+
+\item If ${\cal A}(i,j,k,\ell) = {\cal A}(j,i,k,\ell)$, then $[A_{k,\ell}]_{i,j}=[A_{k,\ell}]_{j,i}$
+\label{sec-1-16-1}%
+
+\item Symmetric blocks: each 3x3 block matrix is symmetric along its diagonal\\
+\label{sec-1-16-2}%
+\[
+\begin{array}{ccc|ccc|ccc}
+1 &  2 &  3 &  19 &  20 &  21 &  37 &  38 &  39 \\
+2 &  4 &  5 &  20 &  22 &  23 &  38 &  40 &  41 \\
+3 &  5 &  6 &  21 &  23 &  24 &  39 &  41 &  42 \\
+\hline
+7 &  8 &  9 &  \colorbox{red}{25} &  \colorbox{yellow}{26} &  \colorbox{cyan}{27} &  43 &  44 &  45 \\
+8 &  10 &  11 &  \colorbox{yellow}{26} &  \colorbox{orange}{28} &  \colorbox{green}{29} &  44 &  46 &  47 \\
+9 &  11 &  12 &  \colorbox{cyan}{27} &  \colorbox{green}{29} &  \colorbox{color17}{30} &  45 &  47 &  48 \\
+\hline
+13 &  14 &  15 &  31 &  32 &  33 &  49 &  50 &  51 \\
+14 &  16 &  17 &  32 &  34 &  35 &  50 &  52 &  53 \\
+15 &  17 &  18 &  33 &  35 &  36 &  51 &  53 &  54 \\
+\end{array}
+\]
+\end{itemize} % ends low level
+\end{frame}
+\begin{frame}
+\frametitle{ERI Tensor Symmetry: Block Structure}
+\label{sec-1-17}
+\begin{itemize}
+
+\item If ${\cal A}(i,j,k,\ell) = {\cal A}(i,j,\ell,k)$, then $[A_{k,\ell}]_{i,j}=[A_{\ell,k}]_{i,j}$
+\label{sec-1-17-1}%
+
+\item Block symmetry: the 9x9 matrix is symmetric at the 3x3 block matrix level\\
+\label{sec-1-17-2}%
+\vspace{1em}
+\begin{array}{ccc|ccc|ccc}
+\colorbox{red}{1} &  \colorbox{red}{4} &  \colorbox{red}{7} &  \colorbox{yellow}{10} &  \colorbox{yellow}{13} &  \colorbox{yellow}{16} &  \colorbox{cyan}{19} &  \colorbox{cyan}{22} &  \colorbox{cyan}{25} \\
+\colorbox{red}{2} &  \colorbox{red}{5} &  \colorbox{red}{8} &  \colorbox{yellow}{11} &  \colorbox{yellow}{14} &  \colorbox{yellow}{17} &  \colorbox{cyan}{20} &  \colorbox{cyan}{23} &  \colorbox{cyan}{26} \\
+\colorbox{red}{3} &  \colorbox{red}{6} &  \colorbox{red}{9} &  \colorbox{yellow}{12} &  \colorbox{yellow}{15} &  \colorbox{yellow}{18} &  \colorbox{cyan}{21} &  \colorbox{cyan}{24} &  \colorbox{cyan}{27} \\
+\colorbox{yellow}{10} &  \colorbox{yellow}{13} &  \colorbox{yellow}{16} &  \colorbox{orange}{28} &  \colorbox{orange}{31} &  \colorbox{orange}{34} &  \colorbox{green}{37} &  \colorbox{green}{40} &  \colorbox{green}{43} \\
+\colorbox{yellow}{11} &  \colorbox{yellow}{14} &  \colorbox{yellow}{17} &  \colorbox{orange}{29} &  \colorbox{orange}{32} &  \colorbox{orange}{35} &  \colorbox{green}{38} &  \colorbox{green}{41} &  \colorbox{green}{44} \\
+\colorbox{yellow}{12} &  \colorbox{yellow}{15} &  \colorbox{yellow}{18} &  \colorbox{orange}{30} &  \colorbox{orange}{33} &  \colorbox{orange}{36} &  \colorbox{green}{39} &  \colorbox{green}{42} &  \colorbox{green}{45} \\
+\colorbox{cyan}{19} &  \colorbox{cyan}{22} &  \colorbox{cyan}{25} &  \colorbox{green}{37} &  \colorbox{green}{40} &  \colorbox{green}{43} &  \colorbox{color17}{46} &  \colorbox{color17}{49} &  \colorbox{color17}{52} \\
+\colorbox{cyan}{20} &  \colorbox{cyan}{23} &  \colorbox{cyan}{26} &  \colorbox{green}{38} &  \colorbox{green}{41} &  \colorbox{green}{44} &  \colorbox{color17}{47} &  \colorbox{color17}{50} &  \colorbox{color17}{53} \\
+\colorbox{cyan}{21} &  \colorbox{cyan}{24} &  \colorbox{cyan}{27} &  \colorbox{green}{39} &  \colorbox{green}{42} &  \colorbox{green}{45} &  \colorbox{color17}{48} &  \colorbox{color17}{51} &  \colorbox{color17}{54} \\
+\end{array}
+\end{itemize} % ends low level
+
+\end{frame}
+
+\begin{frame}
+\frametitle{ERI Tensor Symmetry: Block Structure}
+\label{sec-1-18}
+\begin{itemize}
+
+\item If ${\cal A}(i,j,k,\ell) = {\cal A}(k,\ell,i,j)$, then $[A_{k,\ell}]_{i,j}=[A_{i,j}]_{k,\ell}$
+\label{sec-1-18-1}%
+
+\item Perfect shuffle permutation symmetry: entry $(i,j)$ in the $(k,\ell)$ block is entry $(k,\ell)$ in the $(i,j)$ block\\\\
+\label{sec-1-18-2}%
+\label{sec-3-4-1}%
+\vspace{1em}
+\hspace{3em}
+\begin{array}{ccc|ccc|ccc}
+\colorbox{violet}{1} &  \colorbox{orange}{4} &  \colorbox{cyan}{7} &  \colorbox{orange}{4} &  25 &  28 &  \colorbox{cyan}{7} &  28 &  40 \\
+\colorbox{yellow}{2} &  \colorbox{green}{5} &  \colorbox{color17}{8} &  12 &  26 &  29 &  15 &  33 &  41 \\
+\colorbox{red}{3} &  \colorbox{brown}{6} &  \colorbox{black}{\textcolor{white}{9}} &  19 &  27 &  30 &  22 &  37 &  42 \\
+\hline
+\colorbox{yellow}{2} &  12 &  15 &  \colorbox{green}{5} &  26 &  33 &  \colorbox{color17}{8} &  29 &  41 \\
+10 &  13 &  16 &  13 &  31 &  34 &  16 &  34 &  43 \\
+11 &  14 &  17 &  20 &  32 &  35 &  23 &  38 &  44 \\
+\hline
+\colorbox{red}{3} &  19 &  22 &  \colorbox{brown}{6} &  27 &  37 &  \colorbox{black}{\textcolor{white}{9}} &  30 &  42 \\
+11 &  20 &  23 &  14 &  32 &  38 &  17 &  35 &  44 \\
+18 &  21 &  24 &  21 &  36 &  39 &  24 &  39 &  45 \\
+\end{array}
+
+\end{itemize} % ends low level
+\end{frame}
+\begin{frame}
+\frametitle{ERI Tensor Symmetry: Block Structure}
+\label{sec-1-19}
+\begin{itemize}
+
+\item With all eight symmetries\\
+\label{sec-1-19-1}%
+\vspace{1em}
+\begin{array}{ccc|ccc|ccc}
+1 &  \colorbox{red}{2} &  3 &  \colorbox{red}{2} &  \colorbox{yellow}{7} &  \colorbox{cyan}{8} &  3 &  \colorbox{cyan}{8} &  12 \\
+\colorbox{red}{2} &  4 &  5 &  \colorbox{yellow}{7} &  \colorbox{orange}{9} &  \colorbox{green}{10} &  \colorbox{cyan}{8} &  13 &  14 \\
+3 &  5 &  6 &  \colorbox{cyan}{8} &  \colorbox{green}{10} &  \colorbox{color17}{11} &  12 &  14 &  15 \\
+\hline
+\colorbox{red}{2} &  \colorbox{yellow}{7} &  \colorbox{cyan}{8} &  4 &  \colorbox{orange}{9} &  13 &  5 &  \colorbox{green}{10} &  14 \\
+\colorbox{yellow}{7} &  \colorbox{orange}{9} &  \colorbox{green}{10} &  \colorbox{orange}{9} &  16 &  17 &  \colorbox{green}{10} &  17 &  19 \\
+\colorbox{cyan}{8} &  \colorbox{green}{10} &  \colorbox{color17}{11} &  13 &  17 &  18 &  14 &  19 &  20 \\
+\hline
+3 &  \colorbox{cyan}{8} &  12 &  5 &  \colorbox{green}{10} &  14 &  6 &  \colorbox{color17}{11} &  15 \\
+\colorbox{cyan}{8} &  13 &  14 &  \colorbox{green}{10} &  17 &  19 &  \colorbox{color17}{11} &  18 &  20 \\
+12 &  14 &  15 &  14 &  19 &  20 &  15 &  20 &  21 \\
+\end{array}
+
+\end{itemize} % ends low level
+\end{frame}
+\begin{frame}
+\frametitle{ERI Tensor Symmetry: Block Diagonalization}
+\label{sec-1-20}
+\begin{itemize}
+
+\item Define $Q=\left[Q_{\mbox{\tiny sym}}|Q_{\mbox{\tiny skew}} \right]$ such that
+\label{sec-1-20-1}%
+\begin{itemize}
+
+\item $Q_{\mbox{\tiny sym}}$ and $Q_{\mbox{\tiny skew}}$ are sparse orthonormal bases for vectorized symmetric and skew-symmetric matrices respectively
+\label{sec-1-20-1-1}%
+\end{itemize} % ends low level
+
+\item Then $Q$ is orthogonal and\\
+\label{sec-1-20-2}%
+\[
+Q^{T}AQ \:=\: 
+\left[ \begin{array}{cc} A_{\mbox{\tiny sym}} & 0 \\ 0 & A_{\mbox{\tiny skew}} \rule{0pt}{13pt}
+\end{array}\right]
+\]
+is the block diagonalization of A.
+\end{itemize} % ends low level
+\end{frame}
+\begin{frame}
+\frametitle{ERI Tensor Symmetry: Block Diagonalization}
+\label{sec-1-21}
+
+When $n=3$, \inm{Q}{9}{9}
+\hspace{-2em}
+\begin{equation*}
+Q_{9} = \frac{1}{\sqrt{2}}
+\left[
+\begin{array}{cccccc|rrr}
+\sqrt{2} & 0 & 0  & \textcolor{red}{0} & 0 &0 &\textcolor{blue}{0} &0 &0 \\
+0 & 0 & 0  & \textcolor{red}{1} & 0 &0 &\textcolor{blue}{1} &0 &0 \\
+0 & 0 & 0  & \textcolor{red}{0} & 1 &0 &\textcolor{blue}{0} &1 &0 \\
+0 & 0 & 0  & \textcolor{red}{1} & 0 &0 &\textcolor{blue}{-1} &0 &0 \\
+0 & \sqrt{2} & 0  & \textcolor{red}{0} & 0 &0 &\textcolor{blue}{0} &0 &0 \\
+0 & 0 & 0  & \textcolor{red}{0} & 0 &1 &\textcolor{blue}{0} & 0 &1 \\
+0 & 0 & 0  & \textcolor{red}{0} & 1 &0 &\textcolor{blue}{0} &0 &0 \\
+0 & 0 & 0  & \textcolor{red}{0} & 0 &1 &\textcolor{blue}{0} &{-1} &{-1} \\
+0 & 0 & \sqrt{2}  & \textcolor{red}{0} & 0 &0 &\textcolor{blue}{0} &0 &0 
+\end{array}
+\right]
+= \left[ Q_{\mbox{\tiny sym}} | Q_{\mbox{\tiny skew}} \right]
+\end{equation*}
+\hspace{-3em}
+\[
+Q_{9}(:,4) \:\equiv \: \left[ \begin{array}{ccc} \textcolor{red}{0} & \textcolor{red}{1} & \textcolor{red}{0} \\ \textcolor{red}{1} & \textcolor{red}{0} & \textcolor{red}{0} \\ \textcolor{red}{0} & \textcolor{red}{0} & \textcolor{red}{0} \end{array} \right]
+\qquad
+Q_{9}(:,7) \:\equiv \: \left[ \begin{array}{rrr} \textcolor{blue}{0} & \textcolor{blue}{-1} & \textcolor{blue}{0} \\ \textcolor{blue}{1} & \textcolor{blue}{0} & \textcolor{blue}{0} \\ \textcolor{blue}{0} & \textcolor{blue}{0} & \textcolor{blue}{0} \end{array} \right]
+\]
+\end{frame}
+\begin{frame}
+\frametitle{ERI Tensor Symmetry: Block Factorizations}
+\label{sec-1-22}
+\begin{itemize}
+
+\item When $A$ is positive semi-definite, $A_{\mbox{\tiny sym}}$ and $A_{\mbox{\tiny skew}}$ are too
+\label{sec-1-22-1}%
+
+\item Stable symmetric-pivoting $LDL^{T}$ factorizations:
+\label{sec-1-22-2}%
+\begin{align*}
+P_{\mbox{\tiny sym}}A_{\mbox{\tiny sym}}P_{\mbox{\tiny sym}}^{T}  &=  L_{\mbox{\tiny sym}}D_{\mbox{\tiny sym}}L_{\mbox{\tiny sym}}^{T}\\
+P_{\mbox{\tiny skew}}A_{\mbox{\tiny skew}}P_{\mbox{\tiny skew}}^{T}  &=  L_{\mbox{\tiny skew}}D_{\mbox{\tiny skew}}L_{\mbox{\tiny skew}}^{T}
+\end{align*}
+
+\item Compute a lazy-evaluation, symmetric-pivoting, rank-revealing $LDL^T$ factorization on each block
+\label{sec-1-22-3}%
+
+\item Without rank-revealing $LDL^T$
+\label{sec-1-22-4}%
+\begin{itemize}
+
+\item $n^6/24$ flops for one factorization
+\label{sec-1-22-4-1}%
+
+\item $n^6/12$ flops total
+\label{sec-1-22-4-2}%
+\end{itemize} % ends low level
+
+\item With rank-revealing $LDL^T$, where $r$ is the rank of $A$
+\label{sec-1-22-5}%
+\begin{itemize}
+
+\item $r^2(n(n+1)/2)=r^2(n^2/2+n/2)$ for one factorization
+\label{sec-1-22-5-1}%
+
+\item $r^2n^2$ flops total
+\label{sec-1-22-5-2}%
+\end{itemize} % ends low level
+\end{itemize} % ends low level
+\end{frame}
+\begin{frame}
+\frametitle{ERI Tensor Symmetry: Low-rank approximation}
+\label{sec-1-23}
+
+Let
+\[
+Y_{\mbox{\tiny sym}} \:=\: Q_{\mbox{\tiny sym}}P_{\mbox{\tiny sym}}^{T}L_{\mbox{\tiny sym}} \:=\: [ \:y^{(1)}_{\mbox{\tiny sym}} \:| \: \cdots \:|\:y_{\mbox{\tiny sym}}^{(m_{\mbox{\tiny sym}})} \:]
+\]
+and
+\[
+Y_{\mbox{\tiny skew}} \:=\: Q_{\mbox{\tiny skew}}P_{\mbox{\tiny skew}}^{T}L_{\mbox{\tiny skew}} \:=\: [ \:y^{(1)}_{\mbox{\tiny skew}} \:| \: \cdots \:|\:y_{\mbox{\tiny skew}}^{(m_{\mbox{\tiny skew}})} \:]
+\]
+\end{frame}
+\begin{frame}
+\frametitle{ERI Tensor Symmetry: Low-rank approximation}
+\label{sec-1-24}
+
+\begin{align*}
+A&= Q \left[ \begin{array}{cc} A_{\mbox{\tiny sym}} & 0 \\ 0 & A_{\mbox{\tiny skew}} \end{array} \right] Q^{T}\\
+&=  Q_{\mbox{\tiny sym}}A_{\mbox{\tiny sym}} Q_{\mbox{\tiny sym}}^{T} \:+\: Q_{\mbox{\tiny skew}}A_{\mbox{\tiny skew}} Q_{\mbox{\tiny skew}}^{T}\\
+&= Y_{\mbox{\tiny sym}}D_{\mbox{\tiny sym}} Y_{\mbox{\tiny sym}}^{T} \:+\: Y_{\mbox{\tiny skew}}D_{\mbox{\tiny skew}} Y_{\mbox{\tiny skew}}^{T}\\
+&= \sum_{k=1}^{m_{\mbox{\tiny sym}}} d_{\mbox{\tiny sym}}^{(k)} y_{\mbox{\tiny sym}}^{(k)}[y_{\mbox{\tiny sym}}^{(k)}]^{T} \;+\;
+    \sum_{k=1}^{m_{\mbox{\tiny skew}}} d_{\mbox{\tiny skew}}^{(k)} y_{\mbox{\tiny skew}}^{(k)}[y_{\mbox{\tiny skew}}^{(k)}]^{T}\\
+&= \sum_{k=1}^{m_{\mbox{\tiny sym}}} d_{\mbox{\tiny sym}}^{(k)} B_k \kron B_k+\sum_{k=1}^{m_{\mbox{\tiny skew}}} d_{\mbox{\tiny skew}}^{(k)} C_k \kron C_k
+\end{align*}
+\begin{itemize}
+
+\item $B_k,C_k$ is the $n\times n$ reshaping of $y_{\mbox{\tiny sym}}^{(k)},y_{\mbox{\tiny skew}}^{(k)}$ respectively
+\label{sec-1-24-1}%
+
+\item By terminating these sum early, we obtain low-rank approximations with ERI tensor symmetry.
+\label{sec-1-24-2}%
+
+\end{itemize} % ends low level
+\end{frame}
+\begin{frame}
+\frametitle{ERI Tensor Symmetry: Integral transformation}
+\label{sec-1-25}
+
+\begin{align*}
+\mu 
+&= \sum_{i=1}^n \sum_{j=1}^n \sum_{k=1}^n \sum_{l=1}^n \mathcal{A}(i,j,k,l)v_iv_jv_kv_l\\
+&= (v \otimes v)^T A (v \otimes v)\\
+&= (v\kron v)^{T}(\sum_{k=1}^{m_{\mbox{\tiny sym}}} d_{\mbox{\tiny sym}}^{(k)} B_k \kron B_k+\sum_{k=1}^{m_{\mbox{\tiny skew}}} d_{\mbox{\tiny skew}}^{(k)} C_k \kron C_k)(v \kron v)\\
+&= \sum_{k=1}^{m_{\mbox{\tiny sym}}} d_{\mbox{\tiny sym}}^{(k)} \cdot (v \otimes v)^T(B_k\otimes B_k)(v \otimes v)^T \\ 
+&+ \sum_{k=1}^{m_{\mbox{\tiny skew}}} d_{\mbox{\tiny sym}}^{(k)} \cdot (v \otimes v)^T(B_k\otimes B_k)(v \otimes v)^T\\
+&= \sum_{k=1}^{m_{\mbox{\tiny sym}}} d_{\mbox{\tiny sym}}^{(k)} \cdot (v^TB_kv)^2+ \sum_{k=1}^{m_{\mbox{\tiny skew}}} d_{\mbox{\tiny skew}}^{(k)} \cdot (v^TC_kv)^2
+\end{align*}
+\end{frame}
+\begin{frame}
+\frametitle{ERI Tensor Symmetry: Integral transformation}
+\label{sec-1-26}
+\begin{itemize}
+
+\item $A_{\mbox{\tiny skew}}$ factorization isn't necessary
+\label{sec-1-26-1}%
+
+\item Let $C_k$ be the $n\times n$ reshaping of $\inv{y_{\mbox{\tiny skew}}^{(k)}}{n^2}$
+\label{sec-1-26-2}%
+
+\item By construction $C_k=-C_k^T$ is skew-symmetric, so $v^TC_kv=v^TC_k^Tv=-v^TC_kv=0$
+\label{sec-1-26-3}%
+
+\item The second summation is zero
+\label{sec-1-26-4}%
+\end{itemize} % ends low level
+\end{frame}
+\begin{frame}
+\frametitle{MATLAB Implementation}
+\label{sec-1-27}
+\begin{itemize}
+
+\item IntegralTransformation
+\label{sec-1-27-1}%
+\begin{itemize}
+
+\item Calls StructLDLT on the tensor unfolding
+\label{sec-1-27-1-1}%
+
+\item Does the integral transformation
+\label{sec-1-27-1-2}%
+\end{itemize} % ends low level
+
+\item StructLDLT
+\label{sec-1-27-2}%
+\begin{itemize}
+
+\item Computes diagonal block $A_{\mbox{\tiny sym}}$ (and $A_{\mbox{\tiny skew}}$ optionally)
+\label{sec-1-27-2-1}%
+\begin{itemize}
+
+\item Uses QsymT (next slide)
+\label{sec-1-27-2-1-1}%
+\end{itemize} % ends low level
+
+\item Calls LazyLDLT on $A_{\mbox{\tiny sym}}$ (and on $A_{\mbox{\tiny skew}}$ optionally)
+\label{sec-1-27-2-2}%
+
+\item Returns $Y_{\mbox{\tiny sym}}$ (and $Y_{\mbox{\tiny skew}}$ optionally)
+\label{sec-1-27-2-3}%
+\begin{itemize}
+
+\item Uses Qsym
+\label{sec-1-27-2-3-1}%
+\end{itemize} % ends low level
+\end{itemize} % ends low level
+
+\item LazyLDLT
+\label{sec-1-27-3}%
+\begin{itemize}
+
+\item Evaluate the diagonal of $A$ [$n^2$ ERIs]
+\label{sec-1-27-3-1}%
+
+\item While d(j) is greater than the zero threshold [$r$ loops]
+\label{sec-1-27-3-2}%
+\begin{itemize}
+
+\item Search d(j:n) for largest diagonal element
+\label{sec-1-27-3-2-1}%
+
+\item Swap d(k) and d(j)
+\label{sec-1-27-3-2-2}%
+
+\item Update pivot vector, permute rows of L and A
+\label{sec-1-27-3-2-3}%
+
+\item Evaluate the next subcolumn of A [$O(n^2)$ ERIs]
+\label{sec-1-27-3-2-4}%
+
+\item Compute d(j) and column j of L
+\label{sec-1-27-3-2-5}%
+\end{itemize} % ends low level
+\end{itemize} % ends low level
+\end{itemize} % ends low level
+\end{frame}
+\begin{frame}
+\frametitle{MATLAB Implementation: QsymT}
+\label{sec-1-28}
+\begin{itemize}
+
+\item Goal: find a way to compute $Q_{{\mbox{\tiny sym}}}^Tv$, \inv{v}{n^2} by utilizing the structure of $Q_{{\mbox{\tiny sym}}}^T$
+\label{sec-1-28-1}%
+\begin{itemize}
+
+\item Sparse matrix-multiply?
+\label{sec-1-28-1-1}%
+\end{itemize} % ends low level
+\end{itemize} % ends low level
+\end{frame}
+\begin{frame}
+\frametitle{MATLAB Implementation: QsymT}
+\label{sec-1-29}
+\begin{itemize}
+
+\item No matrix-multiplication necessary
+\label{sec-1-29-1}%
+\begin{align*}
+Q_{sym}^T\left[\begin{array}{c}
+v_1\\
+v_2\\
+v_3\\
+v_4\\
+v_5\\
+v_6\\
+v_7\\
+v_8\\
+v_9 \end{array} \right] = Q_{sym}^T vec\left[\begin{array}{c c c}
+v_1 & v_4 & v_7\\
+v_2 & v_5 & v_8\\
+v_3 & v_6 & v_9\end{array}\right] = \left[\begin{array}{c}
+v_1 \\
+v_5 \\
+v_9 \\
+(v_2 + v_4)/\sqrt{2}\\
+(v_3 + v_7)/\sqrt{2}\\
+(v_6 + v_9)/\sqrt{2}
+\end{array}\right]
+\end{align*}
+\end{itemize} % ends low level
+\end{frame}
+\begin{frame}
+\frametitle{MATLAB Implementation: Qsym}
+\label{sec-1-30}
+
+\begin{align*}
+Q_{sym}\left[\begin{array}{c}
+v_1\\
+v_2\\
+v_3\\
+v_4\\
+v_5\\
+v_6 \end{array} \right] = \left[\begin{array}{c}
+v_1\\
+v_4\\
+v_5\\
+v_4\\
+v_2\\
+v_6\\
+v_5\\
+v_6\\
+v_3 \end{array} \right] = vec\left[\begin{array}{c c c}
+v_1 & v_4 & v_5\\
+v_4 & v_2 & v_6\\
+v_5 & v_6 & v_3\end{array}\right]
+\end{align*}
+\end{frame}
+\begin{frame}
+\frametitle{Summary}
+\label{sec-1-31}
+\begin{itemize}
+
+\item Centrosymmetry and ERI tensor symmetry
+\label{sec-1-31-1}%
+\begin{itemize}
+
+\item Block structure
+\label{sec-1-31-1-1}%
+
+\item Block diagonalization
+\label{sec-1-31-1-2}%
+
+\item Block factorizations
+\label{sec-1-31-1-3}%
+
+\item Low-rank approximation with original symmetry
+\label{sec-1-31-1-4}%
+\end{itemize} % ends low level
+
+\item Structure leads to reduced work
+\label{sec-1-31-2}%
+\begin{itemize}
+
+\item $O(r^2n^2)$ algorithm for computing computing a molecular integral transformation
+\label{sec-1-31-2-1}%
+\end{itemize} % ends low level
+\end{itemize} % ends low level
+\end{frame}
+\begin{frame}
+\frametitle{Future work}
+\label{sec-1-32}
+\begin{itemize}
+
+\item Parallel implementation
+\label{sec-1-32-1}%
+\begin{itemize}
+
+\item Exploit block structure
+\label{sec-1-32-1-1}%
+\end{itemize} % ends low level
+
+\item Sixth order tensor approximation
+\label{sec-1-32-2}%
+\begin{itemize}
+
+\item First three indices are super-symmetric, last three indices are super-symmetric
+\label{sec-1-32-2-1}%
+
+\item Key problem is finding a sparse orthogonal basis to project onto
+\label{sec-1-32-2-2}%
+
+\item Group theory approach looks promising
+\label{sec-1-32-2-3}%
+\end{itemize} % ends low level
+
+\item d-order tensor approximation
+\label{sec-1-32-3}%
+
+\item Thanks to Charles Van Loan, the McNair Scholars program, and David Bindel
+\label{sec-1-32-4}%
+\end{itemize} % ends low level
+\end{frame}
+
+\end{document}
