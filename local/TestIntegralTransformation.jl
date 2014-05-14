@@ -4,14 +4,15 @@ function TestIntegralTransformation()
 
     molecules = ["HF","NH3","H2O2","N2H4","C2H5OH"]
     num_basis_fns = [34, 48, 68, 82, 123]
+    ranks = [200, 300, 400, 500, 750]
     nmols = 2#length(num_basis_fns)
     gen_plots = false
     tol = 1e-6
     
-    unfact_time = zeros(nmols)
-    unfact_space = zeros(nmols)
-    unfact_error = zeros(nmols)
-    unfact_fevals = zeros(nmols)
+    unfact_trans_time = zeros(nmols)
+    unfact_trans_space = zeros(nmols)
+    unfact_trans_error = zeros(nmols)
+    unfact_trans_fevals = zeros(nmols)
 
     full_fact_time = zeros(nmols)
     full_fact_space = zeros(nmols)
@@ -45,15 +46,16 @@ function TestIntegralTransformation()
         tic()
         M = unfact_trans(A,C)
         unfact_time[i] = toc()
-        unfact_error[i] = norm(kron(C,C)*A*kron(C,C)'-M,1)
+        unfact_error[i] = trace(kron(C,C)*A*kron(C,C)'-M)
         println("error: ",unfact_error[i])
 
         # Full factorization
         println("Full factorization")
         tic()
-        L, piv, full_fact_space[i], full_fact_fevals[i] = lapack_full_fact(A,tol)
+        L, piv, full_fact_space[i], full_fact_fevals[i] = 
+        full_fact(A,tol)
         full_fact_time[i] = toc()
-        full_fact_error[i] = norm(A[piv,piv] - L*L',1)
+        full_fact_error[i] = trace(A[piv,piv] - L*L')
         println("error: ", full_fact_error[i])
 
         # Full transformation
@@ -61,18 +63,20 @@ function TestIntegralTransformation()
         tic()
         B, full_trans_space[i] = full_trans(L,piv,C)
         full_trans_time[i] = toc()
-        full_trans_error[i] = norm(kron(C,C)*A*kron(C,C)' - B*B',1)
+        full_trans_error[i] = trace(kron(C,C)*A*kron(C,C)' - B*B')
         println("error: ",full_trans_error[i])
 
-        println("Total time: ",full_fact_time[i]+full_trans_time[i])
+        println("Total time for full algorithm: ",
+                full_fact_time[i]+full_trans_time[i])
         
         # Structured factorization
         println("Structured factorization")
         tic()
-        L, piv, struct_fact_space[i], struct_fact_fevals[i] = lapack_struct_fact(A,tol)
+        L, piv, struct_fact_space[i], struct_fact_fevals[i] = 
+        struct_fact(A,tol)
         struct_fact_time[i] = toc()
         J = QsymTransform(L,piv,n)
-        struct_fact_error[i] = norm(A - J*J',1)
+        struct_fact_error[i] = trace(A - J*J')
         println("error: ",struct_fact_error[i])
         
         # Structured transformation
@@ -80,10 +84,11 @@ function TestIntegralTransformation()
         tic()
         B, struct_trans_space[i] = struct_trans(L,piv,C)
         struct_trans_time[i] = toc()
-        struct_trans_error[i] = norm(kron(C,C)*A*kron(C,C)' - B*B',1)
+        struct_trans_error[i] = trace(kron(C,C)*A*kron(C,C)' - B*B')
         println("error: ",struct_trans_error[i])
 
-        println("Total time: ",struct_fact_time[i]+struct_trans_time[i])
+        println("Total time for structured algorithm: ",
+                struct_fact_time[i]+struct_trans_time[i])
     end
     
     if gen_plots
@@ -93,7 +98,8 @@ function TestIntegralTransformation()
                        struct_fact_time,
                        "Structured factorization",
                        "Number of basis functions",
-                       "Time (seconds)","Time to factorize")
+                       "Time (seconds)",
+                       "Time to factorize")
         plotComparison(num_basis_fns[1:nmols],
                        full_fact_space,
                        "Full factorization",
@@ -108,15 +114,16 @@ function TestIntegralTransformation()
                        struct_fact_error,
                        "Structured factorization",
                        "Number of basis functions",
-                       "Error (1-norm)","Error to factorize")
+                       "Error (1-norm)",
+                       "Factorization Error")
         plotComparison(num_basis_fns[1:nmols],
                        full_fact_fevals,
                        "Full factorization",
                        struct_fact_fevals,
                        "Structured factorization",
                        "Number of basis functions",
-                       "Fevals","Fevals to factorize")
-
+                       "Fevals",
+                       "Fevals to factorize")
         plotComparison(num_basis_fns[1:nmols],
                        full_trans_time,
                        "Full transformation",
@@ -131,28 +138,33 @@ function TestIntegralTransformation()
                        struct_trans_space,
                        "Structured transformation",
                        "Number of basis functions",
-                       "Space (in Float64s)","Space to transform")
+                       "Space (in Float64s)",
+                       "Space to transform")
         plotComparison(num_basis_fns[1:nmols],
                        full_trans_error,
                        "Full transformation",
                        struct_trans_error,
                        "Structured transformation",
                        "Number of basis functions",
-                       "Error (1-norm)","Error to transform")
-
-        plotComparison(num_basis_fns[1:nmols],
+                       "Error (trace norm)",
+                       "Transformation Error")
+        plotComparison3(num_basis_fns[1:nmols],
                        full_fact_time+full_trans_time,
                        "Full factorization plus transformation",
                        struct_fact_time+struct_trans_time,
                        "Structured factorization plus transformation",
+                       unfact_trans_time,
+                       "Unfactorized transformation",
                        "Number of basis functions",
                        "Time (seconds)",
                        "Time to factorize and transform")
-        plotComparison(num_basis_fns[1:nmols],
+        plotComparison3(num_basis_fns[1:nmols],
                        full_fact_space+full_trans_space,
                        "Full factorization plus transformation",
                        struct_fact_space+struct_trans_space,
                        "Structured factorization plus transformation",
+                       unfact_trans_space,
+                       "Unfactorized transformation",
                        "Number of basis functions",
                        "Space in Float64s)",
                        "Space to factorize and transform")
@@ -163,6 +175,18 @@ function plotComparison(x,y1,l1,y2,l2,xlab,ylab,titl)
     figure()
     plot(x,y1,"ro",label=l1)
     plot(x,y2,"bo",label=l2)
+    legend()
+    xlabel(xlab)
+    ylabel(ylab)
+    title(titl)
+    savefig(string(titl,".png"))
+end
+
+function plotComparison3(x,y1,l1,y2,l2,y3,l3,xlab,ylab,titl)
+    figure()
+    plot(x,y1,"ro",label=l1)
+    plot(x,y2,"bo",label=l2)
+    plot(x,y3,"go",label=l3)
     legend()
     xlabel(xlab)
     ylabel(ylab)
@@ -261,6 +285,200 @@ function full_fact(A,tol)
 end
 
 function blocked_full_fact(A,tol,block_size)
+    n = size(A,1)
+    num_blocks = convert(Int64,div(n,block_size)) + (convert(Bool,mod(n,block_size)) ? 1 : 0)
+    D = Array{Float64,2}[]
+    for i=1:num_blocks
+        push!(D,zeros(block_size,block_size))
+        range_i = (i-1)*block_size+1:min(i*block_size,n)
+        D[i] = A[range_i,range_i]
+    end
+    L = Array{Float64,2}[]
+    piv = [1:num_blocks]
+    error = sum(map(trace,D))
+    j = 1
+    while error > tol
+        idx = indmax(map(trace,D[piv[j:num_blocks]]))+j-1
+        piv[j],piv[idx] = piv[idx],piv[j]
+        lower_j = (piv[j]-1)*block_size+1
+        upper_j = min(piv[j]*block_size,n)
+        range_j = lower_j:upper_j
+        block_size_j = upper_j-lower_j+1
+        push!(L,zeros(n,block_size_j))
+        G,_,_,_ = lapack_full_fact(D[piv[j]],1e-12)
+        r = size(G,2)
+        L[j][range_j,1:r] = G
+        for i=j+1:num_blocks
+            lower_i = (piv[i]-1)*block_size+1
+            upper_i = min(piv[i]*block_size,n)
+            range_i = lower_i:upper_i
+            block_size_i = upper_i-lower_i+1
+            S = A[range_i,range_j]
+            for k=1:j-1
+                S -=
+                L[k][range_i,1:block_size]*
+                L[k][range_j,1:block_size]'
+            end
+            G = S/L[j][range_j,1:r]'
+            D[piv[i]] -= G*G'
+            L[j][range_i,1:r] = G
+        end
+        error = sum(map(trace,D[piv[j+1:num_blocks]]))
+        j+=1
+    end
+    L2 = zeros(n,min(block_size*(j-1),n))
+    for p=1:j-1
+        upper_p = min(p*block_size,n)
+        lower_p = (p-1)*block_size+1
+        block_size_p = upper_p - lower_p + 1
+        L2[:,lower_p:upper_p] = L[p]
+    end
+    return L2,piv,0,0
+end
+
+function blocked_full_fact_block_diag(A,tol,block_size)
+    n = size(A,1)
+    num_blocks = convert(Int64,div(n,block_size)) + (convert(Bool,mod(n,block_size)) ? 1 : 0)
+    #d = reshape(diag(d),block_size,num_blocks)
+#    d = zeros(block_size,num_blocks)
+    d = reshape(vcat(diag(A),zeros(num_blocks*block_size-n)),block_size,num_blocks)
+    
+#zeros(block_size,num_blocks)
+#    for j=1:num_blocks
+#        for i=1:block_size
+#            d[i,j] = A[(j-1)*block_size+i,(j-1)*block_size+i]
+#        end
+#    end
+    D = Array{Float64,2}[]
+    for i=1:num_blocks
+        push!(D,zeros(block_size,block_size))
+        range_i = (i-1)*block_size+1:min(i*block_size,n)
+        D[i] = A[range_i,range_i]
+    end
+    L = Array{Float64,2}[]
+    piv = [1:num_blocks]
+    error = sum(d)
+#    error2 = sum(map(trace,D))
+#    println("error-error2: ",error-error2)
+    j = 1
+    while error > tol
+        idx = indmax(sum(d[:,piv[j:num_blocks]],1))+j-1
+#        idx2 = indmax(map(trace,D[piv[j:num_blocks]]))+j-1
+#        println("idx: ",idx)
+#        println("idx2: ",idx2)
+        piv[j],piv[idx] = piv[idx],piv[j]
+        lower_j = (piv[j]-1)*block_size+1
+        upper_j = min(piv[j]*block_size,n)
+        range_j = lower_j:upper_j
+        block_size_j = upper_j-lower_j+1
+        push!(L,zeros(n,block_size_j))
+#        Gd,_,_,_ = lapack_full_fact(D[piv[j]],1e-12)
+#        r2 = size(Gd,2)
+#        println("r2: ",r2)
+#        L[j][range_j,1:r] = G
+        r = block_size
+        for i=j:num_blocks
+            lower_i = (piv[i]-1)*block_size+1
+            upper_i = min(piv[i]*block_size,n)
+            range_i = lower_i:upper_i
+            block_size_i = upper_i-lower_i+1
+            S = A[range_i,range_j]
+            for k=1:j-1
+                S -=
+                L[k][range_i,1:block_size]*
+                L[k][range_j,1:block_size]'
+            end
+#            println("size(S): ",size(S))
+            if i==j
+                G,_,_,_ = lapack_full_fact(S,1e-12)
+                r = size(G,2)
+#                println("r: ",r)
+            else
+                G = S/L[j][range_j,1:r]'
+#                D[piv[i]] -= G*G'
+#                println("i: ",i,", j: ",j)
+#                println("size(G): ",size(G))
+#                println("size(diag(G*G')): ",size(diag(G*G')))
+                d[1:block_size_i,piv[i]] -= 
+                [(G[m,:]*G[m,:]')[1] for m=1:block_size_i]
+            end
+            L[j][range_i,1:r] = G
+        end
+        error = sum(d[:,piv[j:num_blocks]])
+#        error2 = sum(map(trace,D[piv[j+1:num_blocks]]))
+#        println("error-error2: ",error-error2)
+        j+=1
+    end
+    L2 = zeros(n,min(block_size*(j-1),n))
+    for p=1:j-1
+#        upper_p = min(p*block_size,n)
+        lower_p = (p-1)*block_size+1
+#        block_size_p = upper_p - lower_p + 1
+        L2[:,lower_p:lower_p+size(L[p],2)-1] = L[p]
+    end
+    return L2,piv,0,0
+end
+
+function blocked_struct_fact(A,tol,block_size,nb)
+    n = convert(Int64,nb*(nb+1)/2)
+    num_blocks = convert(Int64,div(n,block_size)) + (convert(Bool,mod(n,block_size)) ? 1 : 0)
+    D = Array{Float64,2}[]
+    for i=1:num_blocks
+        lower_i=(i-1)*block_size+1
+        block_size_i=min(i*block_size,n)-lower_i+1
+        push!(D,struct_block(A,lower_i,lower_i,block_size_i,block_size_i))
+#        range_i = (i-1)*block_size+1:min(i*block_size,n)
+#        push!(D,A[range_i,range_i])#zeros(block_size,block_size))
+#        D[i] = A[range_i,range_i]
+    end
+    L = Array{Float64,2}[]
+    piv = [1:num_blocks]
+    piv2 = [1:block_size]
+    error = sum(map(trace,D))
+    j = 1
+    while error > tol
+        idx = indmax(map(trace,D[piv[j:num_blocks]]))+j-1
+        piv[j],piv[idx] = piv[idx],piv[j]
+        lower_j = (piv[j]-1)*block_size+1
+        upper_j = min(piv[j]*block_size,n)
+        range_j = lower_j:upper_j
+        block_size_j = upper_j-lower_j+1
+        push!(L,zeros(n,block_size_j))
+        G,_,_,_ = lapack_full_fact(D[piv[j]],1e-12)
+#        println(size(G))
+#        println(size(range_j))
+        r = size(G,2)
+        L[j][range_j,1:r] = G
+        for i=j+1:num_blocks
+            lower_i = (piv[i]-1)*block_size+1
+            upper_i = min(piv[i]*block_size,n)
+            range_i = lower_i:upper_i
+            block_size_i = upper_i-lower_i+1
+#            S = A[range_i,range_j]
+            S = struct_block(A,lower_i,lower_j,block_size_i,block_size_j)
+            for k=1:j-1
+                S -=
+                L[k][range_i,1:block_size]*
+                L[k][range_j,1:block_size]'
+            end
+            G = S/L[j][range_j,1:r]'
+            D[piv[i]] -= G*G'
+            L[j][range_i,1:r] = G
+        end
+        error = sum(map(trace,D[piv[j+1:num_blocks]]))
+        j+=1
+    end
+    L2 = zeros(n,min(block_size*(j-1),n))
+    for p=1:j-1
+        upper_p = min(p*block_size,n)
+        lower_p = (p-1)*block_size+1
+        block_size_p = upper_p - lower_p + 1
+        L2[:,lower_p:upper_p] = L[p]
+    end
+    return L2,piv,0,0
+end
+
+function blocked_full_fact3(A,tol,block_size)
     # Computes the blocked full factorization of A
     full_fact_space = 0
     full_fact_fevals = 0
@@ -268,20 +486,27 @@ function blocked_full_fact(A,tol,block_size)
     num_blocks = convert(Int64,div(n,block_size)) + (convert(Bool,mod(n,block_size)) ? 1 : 0)
     L = Array{Float64,2}[]
     # evaluate diagonal
-    d = diag(A) # n vector
+#    d = diag(A) # n vector
+    D = Array{Float64,2}[]
+    for i=1:num_blocks
+        upper_i = min((i-1)*block_size,n)
+        block_size_i = upper_i - (i-1)*block_size
+        push!(D,zeros(block_size_i,block_size_i)) # n by block_size_j matrix
+        D[i] = A[(i-1)*block_size+1:upper_i,(i-1)*block_size+1:upper_i]
+    end
     full_fact_space += n
     full_fact_fevals += n
-    error = norm(d,1)
-    piv = [1:n] # n vector
+    error = sum(map(trace,D))
+    piv = [1:num_blocks] # num_blocks vector
     full_fact_space += n
-    diag_blocks = zeros(num_blocks)
+    block_trace = zeros(num_blocks)
     j = 1
     while error > tol
-        for i=j:num_blocks
-            upper_i = min(piv[i]*block_size,n)
-            diag_blocks[i] = sum(d[(piv[i]-1)*block_size+1:upper_i])
-        end
-        idx = indmax(diag_blocks) + j - 1
+#        for i=j:num_blocks
+#            block_trace[i] = trace(D[piv[i]])
+#        end
+#        idx = indmax(block_trace[j:num_blocks]) + j - 1
+        idx = indmax(map(trace,D[piv[j:num_blocks]])) + j - 1
         piv[j],piv[idx] = piv[idx],piv[j]
         lower_j = (piv[j]-1)*block_size+1
         upper_j = min(piv[j]*block_size,n)
@@ -290,31 +515,44 @@ function blocked_full_fact(A,tol,block_size)
         push!(L,zeros(n,block_size_j)) # n by block_size_j matrix
         full_fact_space += n*block_size_j
         for i=j:num_blocks
-            lower_i = (piv[i]-1)*block_size+1
-            upper_i = min(piv[i]*block_size,n)
-            range_i = lower_i:upper_i
-            block_size_i = upper_i - lower_i + 1
             # evaluate block
-            S = A[range_i,range_j]
-            full_fact_fevals += block_size_i*block_size_j
-            for k=1:j-1
-                S -=
-                   L[k][range_i,1:block_size]*
-                   L[k][range_j,1:block_size]'
-            end
-            if i==j
-                G = chol(S,:L)
+#            println("Rank of S: ",rank(S))
+            if last_block_column && i==j+1
+                lower_i = (piv[i]-1)*block_size+1-r
+                upper_i = min(piv[i]*block_size,n)
+                range_i = lower_i:upper_i
+                block_size_i = upper_i - lower_i + 1
+                lower_j = (piv[j]-1)*block_size+1
+                upper_j = min(piv[j]*block_size,n)-r
+                range_j = lower_j:upper_j
+                block_size_j = upper_j - lower_j + 1
             else
+                lower_i = (piv[i]-1)*block_size+1
+                upper_i = min(piv[i]*block_size,n)
+                range_i = lower_i:upper_i
+                block_size_i = upper_i - lower_i + 1
+            end
+
+            if i==j
+                r = rank(D[piv[i]])
+                G = chol(D[piv[i]][1:r,1:r],:L)
+                if r < block_size
+                    last_block_column = true
+                end
+            else
+                S = A[range_i,range_j]
+                full_fact_fevals += block_size_i*block_size_j
+                for k=1:j-1
+                    S -=
+                    L[k][range_i,1:block_size]*
+                    L[k][range_j,1:block_size]'
+                end
                 G = S/L[j][range_j,1:block_size_j]'
-                d[range_i] -= [(G[m,:]*G[m,:]')[1] for m=1:block_size_i]
+                D[piv[i]] -= G*G'
             end
             L[j][range_i,1:block_size_j] = G
         end
-        error = 0
-        for i=j+1:num_blocks
-            upper_i = min(piv[i]*block_size,n)
-            error += sum(d[(piv[i]-1)*block_size+1:upper_i])
-        end
+        error = sum(map(trace,D[piv[j+1:num_blocks]]))
         j += 1
     end
     L2 = zeros(n,min(block_size*(j-1),n))
@@ -356,7 +594,7 @@ function struct_block(A,lower_i,lower_j,block_size_i,block_size_j)
     return block
 end
 
-function sorted_blocked_full_fact(A,tol,block_size)
+function blocked_full_fact2(A,tol,block_size)
     # Computes the sorted blocked full factorization of A
     full_fact_space = 0
     full_fact_fevals = 0
@@ -378,6 +616,7 @@ function sorted_blocked_full_fact(A,tol,block_size)
             diag_blocks[i] = sum(d[(piv[i]-1)*block_size+1:upper_i])
         end
         idx = indmax(diag_blocks) + j - 1
+#        p = sortperm(d,rev=true)
         piv[j],piv[idx] = piv[idx],piv[j]
         lower_j = (piv[j]-1)*block_size+1
         upper_j = min(piv[j]*block_size,n)
@@ -424,8 +663,7 @@ function sorted_blocked_full_fact(A,tol,block_size)
     return L2, piv, full_fact_space, full_fact_fevals
 end
 
-
-function blocked_struct_fact(A,tol,block_size,nb)
+function blocked_struct_fact2(A,tol,block_size,nb)
     # Computes the blocked full factorization of A
     fact_space = 0
     fact_fevals = 0
@@ -463,7 +701,7 @@ function blocked_struct_fact(A,tol,block_size,nb)
         push!(L,zeros(nsym,block_size_j)) # n by block_size_j matrix
         fact_space += nsym*block_size_j
         for i=j:num_blocks
-            println("i: ",i,", j: ",j)
+#            println("i: ",i,", j: ",j)
             lower_i = (piv[i]-1)*block_size+1
             upper_i = min(piv[i]*block_size,nsym)
             range_i = lower_i:upper_i
@@ -588,90 +826,6 @@ function sorted_blocked_struct_fact(A,tol,block_size,nb)
 end
 
 
-function test_facts()
-    tol = 1e-6
-    nbs = [34, 48, 68]
-    block_sizes = [96, 256, 768]
-    ranks = [200, 300, 400]
-    for i=1:length(nbs)#nb=nbs
-        nb = nbs[i]
-        block_size = block_sizes[i]
-        rank = ranks[i]
-        println("nb: ",nb)
-        #    n = convert(Int64,nb*(nb+1)/2)
-        #    A = randn(n,n)
-        #    A = A*A'
-        A = RandERIMatrix(nb,rank)
-
-#        println("Blocked full fact")
-#        tic()
-#        L2, piv, full_fact_space, full_fact_fevals = blocked_full_fact(A,tol,block_size)
-#        toc()
-#        error = norm(A-L2*L2',1)
-#        println("Error: ", error)
-
-        println("Blocked struct fact")
-        tic()
-        L2, piv, full_fact_space, full_fact_fevals = blocked_struct_fact(A,tol,block_size,nb)
-        toc()
-        J = QsymTransform(L2,1:convert(Int64,nb*(nb+1)/2),nb)
-        error = norm(A-J*J',1)
-        println("Error: ", error)
-
-        println("Full fact")
-        tic()
-        L2, piv, full_fact_space, full_fact_fevals = full_fact(A,tol)
-        toc()
-        error = norm(A[piv,piv]-L2*L2',1)
-        println("Error: ", error)
-
-        println("Struct fact")
-        tic()
-        L, piv, struct_fact_space, struct_fact_fevals = struct_fact(A,tol)
-        toc()
-        J = QsymTransform(L,piv,nb)
-        error = norm(A - J*J',1)
-        println("Error: ", error)
-
-        println("LAPACK full fact")
-        Ain = deepcopy(A)
-        tic()
-        L, piv, struct_fact_space, struct_fact_fevals = lapack_full_fact(Ain,tol)
-        toc()
-        error = norm(A[piv,piv]-L*L',1)
-        println("Error: ", error)
-
-        println("LAPACK struct fact")    
-        n2,n2 = size(A)
-        n = convert(Int64,sqrt(n2))
-        Q = Qnn(n)
-        nsym = convert(Int64,n*(n+1)/2)
-        Qsym = Q[:,1:nsym]
-        Asym = Qsym'*A*Qsym
-        tic()
-        L2, piv2, struct_fact_space, struct_fact_fevals = lapack_struct_fact(Asym,tol)
-        toc()
-        J = QsymTransform(L2,piv2,nb)
-        error = norm(A - J*J',1)
-        println("Error: ", error)    
-
-        C = randn(nb,nb)
-
-        println("Full transformation")
-        tic()
-        B, full_trans_space = full_trans(L,piv,C)
-        full_trans_time = toc()
-        full_trans_error = norm(kron(C,C)*A*kron(C,C)' - B*B',1)
-        println("error: ",full_trans_error)
-
-        println("Structured transformation")
-        tic()
-        B, struct_trans_space = struct_trans(L2,piv2,C)
-        struct_trans_time = toc()
-        struct_trans_error = norm(kron(C,C)*A*kron(C,C)' - B*B',1)
-        println("error: ",struct_trans_error)
-    end    
-end
 
 function full_trans(L,piv,C)
     # Computes the factorized full transformation of A
@@ -692,7 +846,6 @@ end
 
 function struct_fact(A,tol)
     # Computes the structured factorization of A
-
     struct_fact_space = 0
     struct_fact_fevals = 0
     n2,n2 = size(A)
@@ -703,7 +856,7 @@ function struct_fact(A,tol)
     L = Array{Float64,1}[]
     m = 1
     # evaluate diagonal
-    # d = diag(A)
+    # d = diag(Asym)
     d = struct_diag(A) # nsym vector
     struct_fact_space += nsym
     struct_fact_fevals += nsym
@@ -718,7 +871,7 @@ function struct_fact(A,tol)
         struct_fact_space += nsym
         L[m][piv[m]] = sqrt(d[piv[m]])
         # evaluate column
-        # A[piv[1:nsym],piv[m]]
+        # Asym[piv[1:nsym],piv[m]]
         col = struct_col(A,piv,m)
         struct_fact_fevals += nsym
         for i=m+1:nsym
@@ -864,448 +1017,6 @@ function RandERIMatrix(n,r)
     return A
 end
 
-function SortOfNaiveIntegralTransformation(A,C)
-    return kron(C,C)'*A*kron(C,C)
-end
-
-function ReallyNaiveIntegralTransformation(T,C)
-    n,n,n,n = size(T)
-    M = zeros(n,n,n,n)
-    for p=1:n
-        for q=1:n
-            for r=1:n
-                for s=1:n
-                    for mu=1:n
-                        for nu=1:n
-                            for lam=1:n
-                                for sig=1:n
-                                    M[p,q,r,s] += C[mu,p]*C[nu,q]*C[lam,r]*C[sig,s]*T[mu,nu,lam,sig]
-                                end
-                            end
-                        end
-                    end
-                end
-            end
-        end
-    end
-    return reshape(M,n^2,n^2)
-end
-
-function NaiveIntegralTransformation(T,C)
-    n,n,n,n = size(T)
-
-    MO = zeros(n,n,n,n)
-    temp = zeros(n,n,n,n)
-    temp2 = zeros(n,n,n,n)
-    temp3 = zeros(n,n,n,n)
-    for mu = 1:n
-	for i = 1:n
-	    temp[mu,:,:,:] += C[i,mu]*T[i,:,:,:]
-	    for nu = 1:n
-	        for j = 1:n
-		    temp2[mu,nu,:,:] += C[j,nu]*temp[mu,j,:,:]
-	            for lam = 1:n
-		        for k = 1:n
-		            temp3[mu,nu,lam,:] += C[k,lam]*temp2[mu,nu,k,:]
-		            for sig = 1:n
-		                for l = 1:n
-			            MO[mu,nu,lam,sig] += C[l,sig]*temp3[mu,nu,lam,l]
-                                end
-                            end
-                        end
-                    end
-                end
-            end
-        end
-    end
-    return reshape(MO,n^2,n^2)
-end
-
-function SVDIntegralTransformation(A,C,tol)
-    # Gets the SVD of A and returns 
-    # 1. The transformed matrix M
-    # 2. The eigenvalues of A
-    # 3. A cell array of the Kronecker Product SVD factors
-    n2,n2 = size(A)
-    n = convert(Int64,sqrt(n2))
-    (V,D) = svd(A);
-    Z = cell(n2)
-    M = zeros(n2,n2)
-    Mt = zeros(n2,n2)
-    for k=1:n2
-        v = V[:,k]
-        B = reshape(v,n,n)        
-        Z[k] = (C'*(B*C))
-        v = vec(Z[k])
-        M = M + D[k]*v*v'
-    end
-    return M,D,Z
-end
-
-function FastIntegralTransformation(A,C,tol)
-    # A is an n^2 by n^2 ERI matrix unfolded as A_ij,kl=(ij|kl)
-    # C is the coefficent matrix from the Hartree Fock method
-    # Transforms A in Atomic Orbital basis to M in Molecular Orbital basis
-    n2,n2 = size(A)
-    n = convert(Int64,sqrt(n2))
-    # Computes the Kronecker Product SVD using lazy-evaluation LDL^T
-    tic()
-    (B, sig) = StructLDLT(A,tol);
-    println("Factorization time")
-    toc()
-    tic()
-    rsym = length(sig)
-    #Z = cell(rsym)
-    Z = zeros(n,n)
-    M = zeros(n2,n2)
-    #Mt = zeros(n2,n2)
-    for k=1:rsym
-        #Z[k] = (C'*(B[k]*C))
-        Z = (C'*(B[k]*C))
-        #v = vec(Z[k])
-        #M = M + sig[k]*v*v'
-    end
-    println("Transformation time")
-    toc()
-    return M,sig,Z
-end
-
-function StructLDLT(A,tol)
-    # A = sum_k sig(k) kron(B[k],B[k])
-
-    (n2,x) = size(A);
-    n = convert(Int64,sqrt(n2));
-
-    nsym = convert(Int64,n*(n+1)/2);
-    nskew = nsym - n;
-
-    # Computing Asym = Qsym'*A*Qsym
-    # QsymTA = Qsym'*A
-    QsymTA = QsymT(A,n,nsym);
-    # Asym = (Qsym'*(Qsym'*A)')'
-    Asym = QsymT(QsymTA',n,nsym)';
-    # Lazy-evaluation LDLT factorization
-    println("LazyLDLT time")
-    Asymtemp = deepcopy(Asym)
-    tic()
-    Lsym, psym, r, _ = LAPACK.pstrf!('L',Asymtemp,1e-6)
-    #    (Lsym,sig,psym) = LazyLDLT(F, tol, nsym, Asym);
-    toc()
-    sig = diag(Lsym)
-    # rsym is the revealed rank of Asym
-    rsym = length(sig);
-    v = zeros(nsym);
-    B = cell(rsym);
-    for k=1:rsym
-        # v = P'*Lsym(:,k)
-        v[psym] = Lsym[:,k];
-        # Reshapes Qsym*v computed without matrix multiplication
-        B[k] = StructReshapeQsymTimesVector(v,n);
-    end
-    return (B, sig)
-end
-
-function QsymT(A,n,nsym)
-    # Returns Qsym'*A without matrix multiplication
-    (x,n2) = size(A);
-    QTA = zeros(nsym,n2)
-    # Computes the resulting matrix column by column
-    for k=1:n2
-        QTA[:,k] = QsymTransposedTimesVector(A[:,k],n,nsym);
-    end
-    return QTA
-end
-
-function QsymTransposedTimesVector(v,n,nsym)
-    # Returns Qsym'*v without matrix multiplication
-    w = zeros(nsym);
-    Ak = reshape(v,n,n);
-    nskew = n^2-nsym;
-    v1 = zeros(nskew);
-    v2 = zeros(nskew);
-    # The first n elements of w are the diagonal elements of Ak
-    d = diag(Ak);
-    w[1:n] = d;
-    AkT = Ak';
-    # v1 is a vector of the the lower triangular elements of Ak
-    for j=1:n-1
-        v1[n*(j-1)-j*(j-1)/2+1:n*j-j*(j+1)/2] = Ak[j+1:n,j];
-    end
-    # v2 is a vector of the the upper triangular elements of Ak
-    for j=1:n-1
-        v2[n*(j-1)-j*(j-1)/2+1:n*j-j*(j+1)/2] = AkT[j+1:n,j];
-    end
-    # The remaining elements of w are sqrt(2) times the average of v1 and v2
-    w[n+1:nsym] = (v1 + v2)/sqrt(2);
-    return w
-end
-
-function F(i,j,A)
-    global numfevals;
-    numfevals = numfevals + 1;
-    return A[i,j];
-end
-
-function LazyLDLT(F, tol, n, A)
-    # Computes the nxn unit lower triangular L, n-vector d, 
-    # and n-vector piv where A(piv,piv) = L*diag(d)*L' using a rank-revealing,
-    # lazy-evaluation, symmetric-pivoting algorithm
-    # d(i) is zero if d(i) <= n*d(1)*tol
-    # F(i,j) is a function which returns the (i,j) entry of nxn matrix A
-    #global numfevals = 0;
-    v = zeros(n);
-    w = zeros(n);
-    temp = zeros(n);
-    d = zeros(n);
-    L = eye(n,n);
-    piv = [i for i in 1:n];
-    thresh = n*d[1]*tol
-    # Get the diagonal elements
-    d = diag(A)
-    #for i=1:n
-    #    d[i] = F(i,i,A);
-    #end
-    j = 1;
-    crit = d[1]
-    while j <= n && crit > thresh
-        # Search d(j:n) for largest diagonal element
-        if j == n
-            alpha = d[j]
-            idx = 1
-        else
-            dvec = d[j:n]
-            (alpha,idx) = maximum(dvec), indmax(dvec)
-        end
-        k = idx+j-1;
-        # Swap dk and dj
-        # d([k j]) = d([j k]);
-        d[k], d[j] = d[j], d[k];
-        # Update piv
-        # piv([k j]) = piv([j k]);
-        piv[k], piv[j] = piv[j], piv[k];
-        # Pivot L
-        # L([k j],:) = L([j k],:);
-        L[k,:], L[j,:] = L[j,:], L[k,:];
-        # L(:,[k j]) = L(:,[j k]);
-        L[:,k], L[:,j] = L[:,j], L[:,k];
-        # Compute w, the next subcolumn of permuted A
-        w[j+1:n] = A[piv[j+1:n],piv[j]]
-        #    temp[j+1:n] = A[piv[j+1:n],piv[j]]
-        #    println("Length of w: ", length(w))
-        #    println("Length of piv[j+1:n]: ", length(piv[j+1:n]))
-        #    println("Length of j+1:n: ", length(j+1:n))
-        #for i=j+1:n
-        #    w[i] = F(piv[i],piv[j],A);
-        #end
-        # Compute d(j) and L(:,j)
-        v[1:j-1] = L[j,1:j-1].*d[1:j-1]'
-        #    temp[1:j-1] = L[j,1:j-1].*d[1:j-1]'
-        #    println("Length of v: ", length(v))
-        #    println("Length of 1:j-1: ", length(1:j-1))
-        #    for i=1:j-1
-        #        v[i]= L[j,i]*d[i];
-        #    end
-        #    println("Error: ",norm(temp[1:j-1]-v[1:j-1]))
-        c = L[j,1:j-1]*v[1:j-1]
-        d[j] = alpha - c[1]
-        L[j+1:n,j] = (w[j+1:n] - L[j+1:n,1:j-1]*v[1:j-1])/d[j]
-        crit = d[j]
-        j = j+1;
-    end
-    if (j != 1 && crit > thresh)
-        j = j-1;
-    elseif (j != 1)
-        j = j-2;
-    end
-    L = L[:,1:j];
-    d = d[1:j];
-    return (L,d,piv)
-end
-
-function Qsym(Asym,n,x)
-    # Returns Qsym*Asym without matrix multiplication
-    (x,n2) = size(Asym);
-    QTA = zeros(n^2,n2);
-    # Computes the resulting matrix column by column
-    for k=1:n2
-        QTA[:,k] = reshape(StructReshapeQsymTimesVector(Asym[:,k],n),n^2,1);
-    end
-    return QTA
-end
-
-function StructReshapeQsymTimesVector(v,n)
-    # Returns Qsym*v computed without matrix multiplication reshaped as n x n
-    # S is symmetric since Qsym is an orthogonal basis for reshaped
-    # symmetric matricies
-
-    # The diagonal elements of S are the first n elements of v
-    D = diagm(v[1:n]);
-    S = zeros(n,n);
-    # The lower triangular part of S is enumerated as 
-    # the remaining elements of v
-    # S(find(tril(ones(n,n),-1))) = v[n+1:length(v)]/sqrt(2);
-    for j=1:n-1
-        S[j+1:n,j] = v[n+n*(j-1)-j*(j-1)/2+1:n+n*j-j*(j+1)/2]/sqrt(2);
-    end
-    S = S + D + S';
-    return S
-end
-
-function TestCholeskyTransformation(A,C)
-    # Returns the transformed integrals by a series of modal products
-    n2,r = size(A)
-    n = convert(Int64,sqrt(n2))
-    #    temp1 = zeros(n,n*r)
-    temp1 = C'*reshape(A,n,n*r)
-    #    temp2 = zeros(n,n*r)
-    temp2 = C'*reshape(permutedims(reshape(temp1,n,n,r),[2 1 3]),n,n*r)
-    MO = zeros(n^2,r)
-    MO = reshape(permutedims(reshape(temp2,n,n,r),[2 1 3]),n^2,r)
-    return MO
-end
-
-function compute_diag(A)
-    return deepcopy(diag(A))
-end
-
-function compute_col(A,j)
-    #    println("j: ",j)
-    #    println("nsym: ",nsym)
-    #    println("size of A: ",size(A))
-    return deepcopy(A[:,j])
-end
-
-function cholesky2(A,n,delta)
-    # initial dimensions
-    #nsym = convert(Int64,nb*(nb+1)/2)
-    q = 1
-    # compute_diagonal
-    d = compute_diag(A)
-    #    display(d)
-    # temporary cholesky factor
-    #    L = zeros(nsym,nsym)
-    L = Array{Float64,1}[]
-    #    println("Size of L: ",size(L))
-    # list of selected pivots
-    #    pivots = 1:nsym
-    pivots = Int64[]
-    # cholesky procedure
-    piv = [i for i in 1:n];
-    thresh = n*d[1]*tol
-    # Get the diagonal elements
-    #d = diag(A)
-    #for i=1:n
-    #    d[i] = F(i,i,A);
-    #end
-    j = 1;
-    crit = d[1]
-    while j <= n && crit > thresh
-        # Search d(j:n) for largest diagonal element
-        if j == n
-            alpha = d[j]
-            idx = 1
-        else
-            dvec = d[j:n]
-            (alpha,idx) = maximum(dvec), indmax(dvec)
-        end
-        k = idx+j-1;
-        # Swap dk and dj
-        # d([k j]) = d([j k]);
-        d[k], d[j] = d[j], d[k];
-        # Update piv
-        # piv([k j]) = piv([j k]);
-        piv[k], piv[j] = piv[j], piv[k];
-        # Pivot L
-        # L([k j],:) = L([j k],:);
-        #    L[k,:], L[j,:] = L[j,:], L[k,:];
-        # L(:,[k j]) = L(:,[j k]);
-        #    L[:,k], L[:,j] = L[:,j], L[:,k];
-        #    while q <= nb
-        #        println("q: ",q)
-        #  select the pivot
-        #        dvec = d[q:nb]
-        #        println("d: ",d)
-        #        (dmax,idx) = maximum(dvec), indmax(dvec)
-        #        pivot = idx+q-1
-        #        pivot = 1
-        #        dmax = d[1]
-        #        for p=1:nb
-        #            if dmax < d[p]
-        #                dmax = d[p]
-        #                pivot = p
-        #            end
-        #        end
-
-        #pivot = 1
-        #dmax = d[1]
-        #for p=1:nsym
-        #    if dmax < d[p]
-        #        dmax = d[p]
-        #        pivot = p
-        #    end
-        #end
-        # Swap dk and dj
-        # d([k j]) = d([j k]);
-        #        d[q], d[pivot] = d[pivot], d[q]
-        # Update piv
-        # piv([k j]) = piv([j k]);
-        #        pivots[pivot], pivots[p] = pivots[q], pivots[pivot]
-
-        #  check to see if convergence reached
-        #        if dmax < delta || dmax < 0
-        #            println("dmax: ",dmax)
-        #            println("delta: ",delta)
-        #            println("Convergence reached")
-        #            break
-        #        end
-        #  if here, we're trying to add this row
-        #        pivots[q] = pivot
-        #        push!(pivots,pivot)
-        #        println("Pivot added: ",pivot)
-        #        println("Pivots: ",pivots)
-        #        Lqq = sqrt(dmax)
-        #  if here, we're really going to add this row
-        #  (m|Q)
-        #        L[:,q] = compute_col(pivot,nsym)
-        push!(L,compute_col(A,pivot))
-
-        #        println("Size of Lq: ",size(L[q]))
-        #        println("Lq: ",L[q])
-        #  [(m|Q) - L_m^P L_Q^P]
-        for p=1:q
-            L[q] = L[q] - L[p][pivots[q]]*L[p]
-        end
-        #  1/L_QQ [(m|Q) - L_m^P L_Q^P]
-        L[q] = L[q]/Lqq
-        #  zero the upper triangle
-        for p=1:q
-            L[q][pivots[p]] = 0
-        end
-        # set the pivot factor
-        L[q][pivot] = Lqq
-        #  update the schur complement diagonal
-        for p=1:nb
-            d[p] -= L[q][p]*L[q][p]
-        end
-        #  force truly zero elements to be zero
-        for p=1:q
-            d[pivots[p]] = 0
-        end
-        q += 1
-        #    c = L[j,1:j-1]*v[1:j-1]
-        #    d[j] = alpha - c[1]
-        #    L[j+1:n,j] = (w[j+1:n] - L[j+1:n,1:j-1]*v[1:j-1])/d[j]
-        #    crit = d[j]
-    end
-    # copy into a more permament matrix object
-    println("q: ",q)
-    G = zeros(nb,q-1)
-    for p=1:q-1
-        G[:,p] = L[p]
-    end
-    return G, pivots
-end
-
 function inv_col(k,n)
     # function i = inv_col(k,n)
     # n is a d-vector with positive integer entries
@@ -1379,9 +1090,9 @@ function LazyCholesky(A,tol)
     end
     G = zeros(n,m-1)
     for p=1:m-1
-        G[:,p] = L[p][piv]
+        G[:,p] = L[p]#[piv]
     end
-    return (G,piv)
+    return G#(G,piv)
 end
 
 function GaxpyLazyCholesky(A,tol)
@@ -1627,18 +1338,16 @@ function dpstrfL(A,tol,nb)
 end
 
 function lapack_full_fact(A,tol)
-#    Ain = deepcopy(A)
     Aout, piv, rank, info = LAPACK.pstrf!('L', A, tol)
     L = tril(Aout)
-    L = L[:,1:rank]
-    return L, piv, 0, 0
+    L[piv,1:rank] = L[:,1:rank]
+    return L[:,1:rank], piv, 0, 0
 end
 
 function lapack_struct_fact(Asym,tol)
     Aout, piv, rank, info = LAPACK.pstrf!('L', Asym, tol)
     L = tril(Aout)
     L = L[:,1:rank]
-    p
     return L, piv, 0, 0
 end
 
@@ -1652,7 +1361,227 @@ function TestDsptrfL()
     println("Error: ",error)
 end
 
+function randInRange(n,num)
+    indices = zeros(num); x = 0;
+    for i=1:num
+        x = floor(n*rand())+1;
+        while true
+            if !(x in indices)
+                break
+            else
+                x = round(n*rand())
+            end
+        end
+        indices[i] = x
+    end
+    return indices
+end
+
+function test_blocked_pivoted_cholesky()
+    n = 34^2
+    r = 34^2
+    tol = 1e-6
+    A = randn(n,r)
+    A = A*A'
+    block_size = 32
+    num_blocks = convert(Int64,div(n,block_size)) + (convert(Bool,mod(n,block_size)) ? 1 : 0)
+    println("Block size: ",block_size)
+    println("Number of blocks: ",num_blocks)
+    D = Array{Float64,2}[]
+    for i=1:num_blocks
+        push!(D,zeros(block_size,block_size))
+        range_i = (i-1)*block_size+1:min(i*block_size,n)
+        D[i] = A[range_i,range_i]
+#        println("size(D[i])",size(D[i]))
+    end
+    L = Array{Float64,2}[]
+    piv = [1:num_blocks]
+    piv2 = [1:block_size]
+    error = sum(map(trace,D))
+    j = 1
+    while error > tol
+        idx = indmax(map(trace,D[piv[j:num_blocks]]))+j-1
+        piv[j],piv[idx] = piv[idx],piv[j]
+        lower_j = (piv[j]-1)*block_size+1
+        upper_j = min(piv[j]*block_size,n)
+        range_j = lower_j:upper_j
+        block_size_j = upper_j-lower_j+1
+        push!(L,zeros(n,block_size_j))
+#        println("size(D[piv[j]])",size(D[piv[j]]))
+        G = LazyCholesky(D[piv[j]],1e-16)
+        r = size(G,2)
+        L[j][range_j,1:r] = G
+        for i=j+1:num_blocks
+            lower_i = (piv[i]-1)*block_size+1
+            upper_i = min(piv[i]*block_size,n)
+            range_i = lower_i:upper_i
+            block_size_i = upper_i-lower_i+1
+            S = A[range_i,range_j]
+            for k=1:j-1
+                S -=
+                L[k][range_i,1:block_size]*
+                L[k][range_j,1:block_size]'
+            end
+            G = S/L[j][range_j,1:r]'
+            D[piv[i]] -= G*G'
+            L[j][range_i,1:r] = G
+        end
+        error = sum(map(trace,D[piv[j+1:num_blocks]]))
+        j+=1
+    end
+    L2 = zeros(n,min(block_size*(j-1),n))
+    for p=1:j-1
+        upper_p = min(p*block_size,n)
+        lower_p = (p-1)*block_size+1
+        block_size_p = upper_p - lower_p + 1
+        L2[:,lower_p:upper_p] = L[p]
+    end
+    
+    error = trace(A-L2*L2')
+    println("\nError: ",error)
+#    println("num_blocks in piv[1:j-1]?: ",num_blocks in piv[1:j-1])
+end
+
+function test_facts()
+    tol = 1e-6
+    nbs = [34, 48, 68]
+    block_sizes = [96, 256, 768]
+    ranks = [200, 300, 400]
+    for i=1:length(nbs)
+        nb = nbs[i]
+        block_size = block_sizes[i]
+        rank = ranks[i]
+        println("nb: ",nb)
+        A = RandERIMatrix(nb,rank)
+
+        println("Blocked full fact")
+        tic()
+        L2, piv, full_fact_space, full_fact_fevals = blocked_full_fact(A,tol,block_size)
+        toc()
+        error = trace(A-L2*L2')
+        println("Error: ", error)
+
+        println("Blocked full fact (block diag)")
+        tic()
+        L2, piv, full_fact_space, full_fact_fevals = blocked_full_fact_block_diag(A,tol,block_size)
+        toc()
+        error = trace(A-L2*L2')
+        println("Error: ", error)
+
+        println("Blocked struct fact")
+        tic()
+        L2, piv, full_fact_space, full_fact_fevals = blocked_struct_fact(A,tol,block_size,nb)
+        toc()
+        J = QsymTransform(L2,1:convert(Int64,nb*(nb+1)/2),nb)
+        error = norm(A-J*J',1)
+#        error = norm(A-L2*L2',1)
+        println("Error: ", error)
+
+        println("Full fact")
+        tic()
+        L2, piv, full_fact_space, full_fact_fevals = full_fact(A,tol)
+        toc()
+        error = norm(A[piv,piv]-L2*L2',1)
+        println("Error: ", error)
+
+        println("Struct fact")
+        tic()
+        L, piv, struct_fact_space, struct_fact_fevals = struct_fact(A,tol)
+        toc()
+        J = QsymTransform(L,piv,nb)
+        error = norm(A - J*J',1)
+        println("Error: ", error)
+
+        println("LAPACK full fact")
+        Ain = deepcopy(A)
+        tic()
+        L, piv, struct_fact_space, struct_fact_fevals = lapack_full_fact(Ain,tol)
+        toc()
+        error = norm(A[piv,piv]-L*L',1)
+        println("Error: ", error)
+
+        println("LAPACK struct fact")    
+        n2,n2 = size(A)
+        n = convert(Int64,sqrt(n2))
+        Q = Qnn(n)
+        nsym = convert(Int64,n*(n+1)/2)
+        Qsym = Q[:,1:nsym]
+        Asym = Qsym'*A*Qsym
+        tic()
+        L2, piv2, struct_fact_space, struct_fact_fevals = lapack_struct_fact(Asym,tol)
+        toc()
+        J = QsymTransform(L2,piv2,nb)
+        error = norm(A - J*J',1)
+        println("Error: ", error)    
+
+        C = randn(nb,nb)
+
+        println("Full transformation")
+        tic()
+        B, full_trans_space = full_trans(L,piv,C)
+        full_trans_time = toc()
+        full_trans_error = norm(kron(C,C)*A*kron(C,C)' - B*B',1)
+        println("error: ",full_trans_error)
+
+        println("Structured transformation")
+        tic()
+        B, struct_trans_space = struct_trans(L2,piv2,C)
+        struct_trans_time = toc()
+        struct_trans_error = norm(kron(C,C)*A*kron(C,C)' - B*B',1)
+        println("error: ",struct_trans_error)
+    end    
+end
+
+function tune_blocked_facts()
+    tol = 1e-6
+    molecules = ["HF","NH3","H2O2","N2H4","C2H5OH"]
+    num_basis_fns = [34, 48, 68, 82, 123]
+    ranks = [200, 300, 400, 500, 750]
+    block_sizes = [32, 64, 96, 128, 192, 256, 384, 512]
+    nmols = 3
+    timings = zeros(nmols,length(block_sizes),3)
+    for i=1:nmols
+        nbf = num_basis_fns[i]
+        n = nbf^2
+        r = ranks[i]
+        C = randn(nbf,nbf)
+        println("n: ",n)
+        for b = 1:length(block_sizes)
+            nb = block_sizes[b]
+            println("block size: ",nb)
+            A = randn(n,r)
+            A = A*A'
+            # Blocked pivoted Cholesky
+            println("Blocked pivoted Cholesky")
+            tic()
+            L2, piv, full_fact_space, full_fact_fevals = blocked_full_fact(A,tol,nb)
+            timings[i,b,1] = toc()
+            error = norm(A-L2*L2',1)
+            println("Error: ", error)
+            # LAPACK pstrf
+            println("LAPACK pstrf")
+            tic()
+            L2, piv, full_fact_space, full_fact_fevals = lapack_full_fact(A,tol)
+            timings[i,b,2] = toc()
+            error = norm(A-L2*L2',1)
+            println("Error: ", error)                        
+            # Unfactorized transformation
+            println("Unfactorized transformation")
+            tic()
+            M = unfact_trans(A,C)
+            timings[i,b,3] = toc()
+            error = trace(kron(C,C)*A*kron(C,C)'-M)
+            println("Error: ", error)
+        end
+    end
+    plotComparison3(block_sizes,vec(timings[1,:,1]),"Blocked pivoted Cholesky",vec(timings[1,:,2]),"LAPACK pstrf",vec(timings[1,:,3]),"Unfactorized transformation","Block size","Time in seconds","Timings for HF")
+    plotComparison3(block_sizes,vec(timings[2,:,1]),"Blocked pivoted Cholesky",vec(timings[2,:,2]),"LAPACK pstrf",vec(timings[2,:,3]),"Unfactorized transformation","Block size","Time in seconds","Timings for NH3")
+    plotComparison3(block_sizes,vec(timings[3,:,1]),"Blocked pivoted Cholesky",vec(timings[3,:,2]),"LAPACK pstrf",vec(timings[3,:,3]),"Unfactorized transformation","Block size","Time in seconds","Timings for H2O2")
+end
+
 #TestIntegralTransformation()
 #TestStructTransform()
 #TestDsptrfL()
-test_facts()
+#test_facts()
+#test_blocked_pivoted_cholesky()
+tune_blocked_facts()
