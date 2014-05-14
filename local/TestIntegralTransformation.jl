@@ -1545,7 +1545,7 @@ function tune_blocked_facts()
     num_basis_fns = [34, 48, 68, 82, 123]
     ranks = [200, 300, 400, 500, 750]
     block_sizes = [32, 64, 96, 128, 192, 256, 384, 512]
-    nmols = 3
+    nmols = 2
     num_facts = 4
     timings = zeros(nmols,length(block_sizes),num_facts)
     for i=1:nmols
@@ -1575,8 +1575,9 @@ function tune_blocked_facts()
             println("Error: ", error)
             # LAPACK pstrf
             println("LAPACK pstrf")
+            Ain = deepcopy(A)
             tic()
-            L2, piv, full_fact_space, full_fact_fevals = lapack_full_fact(deepcopy(A),tol)
+            L2, piv, full_fact_space, full_fact_fevals = lapack_full_fact(Ain,tol)
             timings[i,b,3] = toc()
             error = norm(A-L2*L2',1)
             println("Error: ", error)                         
@@ -1589,11 +1590,10 @@ function tune_blocked_facts()
             println("Error: ", error)
         end
     end
-    plotComparison4(block_sizes,vec(timings[1,:,1]),"Blocked pivoted Cholesky (diagonal blocks)",vec(timings[1,:,2]),"Blocked pivoted Cholesky (diagonal)",vec(timings[1,:,3]),"LAPACK pstrf",vec(timings[1,:,4]),"Unfactorized transformation","Block size","Time in seconds","Timings for HF")
-    plotComparison4(block_sizes,vec(timings[2,:,1]),"Blocked pivoted Cholesky (diagonal blocks)",vec(timings[2,:,2]),"Blocked pivoted Cholesky (diagonal)",vec(timings[2,:,3]),"LAPACK pstrf",vec(timings[2,:,4]),"Unfactorized transformation","Block size","Time in seconds","Timings for NH3")
-    plotComparison4(block_sizes,vec(timings[3,:,1]),"Blocked pivoted Cholesky (diagonal blocks)",vec(timings[3,:,2]),"Blocked pivoted Cholesky (diagonal)",vec(timings[3,:,3]),"LAPACK pstrf",vec(timings[3,:,4]),"Unfactorized transformation","Block size","Time in seconds","Timings for H2O2")
-#    plotComparison3(block_sizes,vec(timings[2,:,1]),"Blocked pivoted Cholesky",vec(timings[2,:,2]),"LAPACK pstrf",vec(timings[2,:,3]),"Unfactorized transformation","Block size","Time in seconds","Timings for NH3")
-#    plotComparison3(block_sizes,vec(timings[3,:,1]),"Blocked pivoted Cholesky",vec(timings[3,:,2]),"LAPACK pstrf",vec(timings[3,:,3]),"Unfactorized transformation","Block size","Time in seconds","Timings for H2O2")
+
+    for i=1:nmols
+        plotComparison4(block_sizes,vec(timings[i,:,1]),"Blocked pivoted Cholesky (diagonal blocks)",vec(timings[i,:,2]),"Blocked pivoted Cholesky (diagonal)",vec(timings[i,:,3]),"LAPACK pstrf",vec(timings[i,:,4]),"Unfactorized transformation","Block size","Time in seconds",string("Timings for ",molecules[i]))
+    end
 end
 
 #TestIntegralTransformation()
