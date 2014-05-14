@@ -1545,7 +1545,7 @@ function tune_blocked_facts()
     num_basis_fns = [34, 48, 68, 82, 123]
     ranks = [200, 300, 400, 500, 750]
     block_sizes = [32, 64, 96, 128, 192, 256, 384, 512]
-    nmols = 2
+    nmols = 3
     num_facts = 4
     timings = zeros(nmols,length(block_sizes),num_facts)
     for i=1:nmols
