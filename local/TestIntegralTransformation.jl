@@ -194,6 +194,19 @@ function plotComparison3(x,y1,l1,y2,l2,y3,l3,xlab,ylab,titl)
     savefig(string(titl,".png"))
 end
 
+function plotComparison4(x,y1,l1,y2,l2,y3,l3,y4,l4,xlab,ylab,titl)
+    figure()
+    plot(x,y1,"ro",label=l1)
+    plot(x,y2,"bo",label=l2)
+    plot(x,y3,"go",label=l3)
+    plot(x,y4,"wo",label=l4)
+    legend()
+    xlabel(xlab)
+    ylabel(ylab)
+    title(titl)
+    savefig(string(titl,".png"))
+end
+
 function QsymTransform(L,piv,n)
     # Applies Qsym to G
     nsym,r = size(L)
@@ -289,9 +302,9 @@ function blocked_full_fact(A,tol,block_size)
     num_blocks = convert(Int64,div(n,block_size)) + (convert(Bool,mod(n,block_size)) ? 1 : 0)
     D = Array{Float64,2}[]
     for i=1:num_blocks
-        push!(D,zeros(block_size,block_size))
         range_i = (i-1)*block_size+1:min(i*block_size,n)
-        D[i] = A[range_i,range_i]
+#        D[i] = A[range_i,range_i]
+        push!(D,A[range_i,range_i])
     end
     L = Array{Float64,2}[]
     piv = [1:num_blocks]
@@ -305,7 +318,7 @@ function blocked_full_fact(A,tol,block_size)
         range_j = lower_j:upper_j
         block_size_j = upper_j-lower_j+1
         push!(L,zeros(n,block_size_j))
-        G,_,_,_ = lapack_full_fact(D[piv[j]],1e-12)
+        G,_,_,_ = lapack_full_fact(D[piv[j]],tol)
         r = size(G,2)
         L[j][range_j,1:r] = G
         for i=j+1:num_blocks
@@ -313,6 +326,7 @@ function blocked_full_fact(A,tol,block_size)
             upper_i = min(piv[i]*block_size,n)
             range_i = lower_i:upper_i
             block_size_i = upper_i-lower_i+1
+            # GEMM update of subdiagonal blocks
             S = A[range_i,range_j]
             for k=1:j-1
                 S -=
@@ -320,8 +334,10 @@ function blocked_full_fact(A,tol,block_size)
                 L[k][range_j,1:block_size]'
             end
             G = S/L[j][range_j,1:r]'
+            # SYRK update of diagonal blocks
             D[piv[i]] -= G*G'
             L[j][range_i,1:r] = G
+#            push!(L,G)
         end
         error = sum(map(trace,D[piv[j+1:num_blocks]]))
         j+=1
@@ -330,31 +346,22 @@ function blocked_full_fact(A,tol,block_size)
     for p=1:j-1
         upper_p = min(p*block_size,n)
         lower_p = (p-1)*block_size+1
-        block_size_p = upper_p - lower_p + 1
+#        block_size_p = upper_p - lower_p + 1
         L2[:,lower_p:upper_p] = L[p]
     end
     return L2,piv,0,0
 end
 
-function blocked_full_fact_block_diag(A,tol,block_size)
+function blocked_full_fact_diag(A,tol,block_size)
     n = size(A,1)
     num_blocks = convert(Int64,div(n,block_size)) + (convert(Bool,mod(n,block_size)) ? 1 : 0)
-    #d = reshape(diag(d),block_size,num_blocks)
-#    d = zeros(block_size,num_blocks)
-    d = reshape(vcat(diag(A),zeros(num_blocks*block_size-n)),block_size,num_blocks)
-    
-#zeros(block_size,num_blocks)
-#    for j=1:num_blocks
-#        for i=1:block_size
-#            d[i,j] = A[(j-1)*block_size+i,(j-1)*block_size+i]
-#        end
+    d = reshape(vcat(diag(A),zeros(num_blocks*block_size-n)),block_size,num_blocks)    
+#    D = Array{Float64,2}[]
+#    for i=1:num_blocks
+#        push!(D,zeros(block_size,block_size))
+#        range_i = (i-1)*block_size+1:min(i*block_size,n)
+#        D[i] = A[range_i,range_i]
 #    end
-    D = Array{Float64,2}[]
-    for i=1:num_blocks
-        push!(D,zeros(block_size,block_size))
-        range_i = (i-1)*block_size+1:min(i*block_size,n)
-        D[i] = A[range_i,range_i]
-    end
     L = Array{Float64,2}[]
     piv = [1:num_blocks]
     error = sum(d)
@@ -390,7 +397,7 @@ function blocked_full_fact_block_diag(A,tol,block_size)
             end
 #            println("size(S): ",size(S))
             if i==j
-                G,_,_,_ = lapack_full_fact(S,1e-12)
+                G,_,_,_ = lapack_full_fact(S,tol)
                 r = size(G,2)
 #                println("r: ",r)
             else
@@ -1539,7 +1546,8 @@ function tune_blocked_facts()
     ranks = [200, 300, 400, 500, 750]
     block_sizes = [32, 64, 96, 128, 192, 256, 384, 512]
     nmols = 3
-    timings = zeros(nmols,length(block_sizes),3)
+    num_facts = 4
+    timings = zeros(nmols,length(block_sizes),num_facts)
     for i=1:nmols
         nbf = num_basis_fns[i]
         n = nbf^2
@@ -1551,32 +1559,40 @@ function tune_blocked_facts()
             println("block size: ",nb)
             A = randn(n,r)
             A = A*A'
-            # Blocked pivoted Cholesky
-            println("Blocked pivoted Cholesky")
+            # Blocked pivoted Cholesky (precompute diagonal blocks)
+            println("Blocked pivoted Cholesky (precompute diagonal blocks)")
             tic()
             L2, piv, full_fact_space, full_fact_fevals = blocked_full_fact(A,tol,nb)
             timings[i,b,1] = toc()
+            error = norm(A-L2*L2',1)
+            println("Error: ", error)
+            # Blocked pivoted Cholesky (precompute diagonal)
+            println("Blocked pivoted Cholesky (precompute diagonal)")
+            tic()
+            L2, piv, full_fact_space, full_fact_fevals = blocked_full_fact_diag(A,tol,nb)
+            timings[i,b,2] = toc()
             error = norm(A-L2*L2',1)
             println("Error: ", error)
             # LAPACK pstrf
             println("LAPACK pstrf")
             tic()
             L2, piv, full_fact_space, full_fact_fevals = lapack_full_fact(A,tol)
-            timings[i,b,2] = toc()
+            timings[i,b,3] = toc()
             error = norm(A-L2*L2',1)
-            println("Error: ", error)                        
+            println("Error: ", error)                         
             # Unfactorized transformation
             println("Unfactorized transformation")
             tic()
             M = unfact_trans(A,C)
-            timings[i,b,3] = toc()
+            timings[i,b,4] = toc()
             error = trace(kron(C,C)*A*kron(C,C)'-M)
             println("Error: ", error)
         end
     end
-    plotComparison3(block_sizes,vec(timings[1,:,1]),"Blocked pivoted Cholesky",vec(timings[1,:,2]),"LAPACK pstrf",vec(timings[1,:,3]),"Unfactorized transformation","Block size","Time in seconds","Timings for HF")
-    plotComparison3(block_sizes,vec(timings[2,:,1]),"Blocked pivoted Cholesky",vec(timings[2,:,2]),"LAPACK pstrf",vec(timings[2,:,3]),"Unfactorized transformation","Block size","Time in seconds","Timings for NH3")
-    plotComparison3(block_sizes,vec(timings[3,:,1]),"Blocked pivoted Cholesky",vec(timings[3,:,2]),"LAPACK pstrf",vec(timings[3,:,3]),"Unfactorized transformation","Block size","Time in seconds","Timings for H2O2")
+    plotComparison4(block_sizes,vec(timings[1,:,1]),"Blocked pivoted Cholesky (diagonal blocks)",vec(timings[1,:,2]),"Blocked pivoted Cholesky (diagonal)",vec(timings[1,:,3]),"LAPACK pstrf",vec(timings[1,:,4]),"Unfactorized transformation","Block size","Time in seconds","Timings for HF")
+    plotComparison4(block_sizes,vec(timings[1,:,1]),"Blocked pivoted Cholesky (diagonal blocks)",vec(timings[1,:,2]),"Blocked pivoted Cholesky (diagonal)",vec(timings[1,:,3]),"LAPACK pstrf",vec(timings[1,:,4]),"Unfactorized transformation","Block size","Time in seconds","Timings for NH3")
+#    plotComparison3(block_sizes,vec(timings[2,:,1]),"Blocked pivoted Cholesky",vec(timings[2,:,2]),"LAPACK pstrf",vec(timings[2,:,3]),"Unfactorized transformation","Block size","Time in seconds","Timings for NH3")
+#    plotComparison3(block_sizes,vec(timings[3,:,1]),"Blocked pivoted Cholesky",vec(timings[3,:,2]),"LAPACK pstrf",vec(timings[3,:,3]),"Unfactorized transformation","Block size","Time in seconds","Timings for H2O2")
 end
 
 #TestIntegralTransformation()
