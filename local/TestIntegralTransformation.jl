@@ -297,13 +297,48 @@ function full_fact(A,tol)
     return L2, piv, full_fact_space, full_fact_fevals
 end
 
+function unblocked_psi4(A,tol)
+    # Computes the full factorization of A
+    n = size(A,1)
+    col = zeros(n) # n vector
+    L = Array{Float64,1}[]
+    m = 1
+    # evaluate diagonal
+    d = diag(A) # n vector
+    error = norm(d,1)
+    piv = [1:n] # n vector
+    while error > tol
+        idx = indmax(d[piv[m:n]])
+        i = idx+m-1
+        piv[m], piv[i] = piv[i], piv[m]
+        push!(L,zeros(n)) # n vector
+        L[m][piv[m]] = sqrt(d[piv[m]])
+        # evaluate column
+        col = A[piv[1:n],piv[m]]
+        for i=m+1:n
+            s = 0
+            for j=1:m-1
+                s += L[j][piv[m]]*L[j][piv[i]]
+            end
+            L[m][piv[i]] = (col[i] - s)/L[m][piv[m]]
+            d[piv[i]] = d[piv[i]] - L[m][piv[i]]*L[m][piv[i]]
+        end
+        error = sum(d[piv[m+1:n]])
+        m += 1
+    end
+    L2 = zeros(n,m-1)
+    for p=1:m-1
+        L2[:,p] = L[p]
+    end
+    return L2
+end
+
 function blocked_full_fact(A,tol,block_size)
     n = size(A,1)
     num_blocks = convert(Int64,div(n,block_size)) + (convert(Bool,mod(n,block_size)) ? 1 : 0)
     D = Array{Float64,2}[]
     for i=1:num_blocks
         range_i = (i-1)*block_size+1:min(i*block_size,n)
-#        D[i] = A[range_i,range_i]
         push!(D,A[range_i,range_i])
     end
     L = Array{Float64,2}[]
@@ -337,7 +372,6 @@ function blocked_full_fact(A,tol,block_size)
             # SYRK update of diagonal blocks
             D[piv[i]] -= G*G'
             L[j][range_i,1:r] = G
-#            push!(L,G)
         end
         error = sum(map(trace,D[piv[j+1:num_blocks]]))
         j+=1
@@ -346,8 +380,63 @@ function blocked_full_fact(A,tol,block_size)
     for p=1:j-1
         upper_p = min(p*block_size,n)
         lower_p = (p-1)*block_size+1
-#        block_size_p = upper_p - lower_p + 1
         L2[:,lower_p:upper_p] = L[p]
+    end
+    return L2,piv,0,0
+end
+
+function blocked_full_fact_row_major(A,tol,block_size)
+    n = size(A,1)
+    num_blocks = convert(Int64,div(n,block_size)) + (convert(Bool,mod(n,block_size)) ? 1 : 0)
+    D = Array{Float64,2}[]
+    for i=1:num_blocks
+        range_i = (i-1)*block_size+1:min(i*block_size,n)
+        push!(D,A[range_i,range_i])
+    end
+    L = [Array{Float64,2}[] for i=1:num_blocks]
+    piv = [1:num_blocks]
+    error = sum(map(trace,D))
+    j = 1
+    while error > tol
+        idx = indmax(map(trace,D[piv[j:num_blocks]]))+j-1
+        piv[j],piv[idx] = piv[idx],piv[j]
+        lower_j = (piv[j]-1)*block_size+1
+        upper_j = min(piv[j]*block_size,n)
+        range_j = lower_j:upper_j
+        block_size_j = upper_j-lower_j+1
+        G,_,_,_ = lapack_full_fact(D[piv[j]],tol)
+        r = size(G,2)
+        # L[piv[j]][j] = G
+        push!(L[piv[j]],G)
+        for i=j+1:num_blocks
+            lower_i = (piv[i]-1)*block_size+1
+            upper_i = min(piv[i]*block_size,n)
+            range_i = lower_i:upper_i
+            block_size_i = upper_i-lower_i+1
+            # GEMM update of subdiagonal blocks
+            S = A[range_i,range_j]
+            for k=1:j-1
+                S -= L[piv[i]][k]*L[piv[j]][k]'
+            end
+            G = S/L[piv[j]][j]'
+            # SYRK update of diagonal blocks
+            D[piv[i]] -= G*G'
+            # L[piv[i]][j] = G
+            push!(L[piv[i]],G)
+        end
+        error = sum(map(trace,D[piv[j+1:num_blocks]]))
+        j+=1
+    end
+    L2 = zeros(n,min(block_size*(j-1),n))
+    for jj=1:j-1
+        lower_j = (jj-1)*block_size+1
+        for ii=jj:num_blocks
+            lower_i = (piv[ii]-1)*block_size+1
+            block_size_i,block_size_j = size(L[piv[ii]][jj])
+            range_i = lower_i:min(lower_i+block_size_i-1,n)
+            range_j = lower_j:min(lower_j+block_size_j-1,n)
+            L2[range_i,range_j] = L[piv[ii]][jj]
+        end
     end
     return L2,piv,0,0
 end
@@ -356,33 +445,18 @@ function blocked_full_fact_diag(A,tol,block_size)
     n = size(A,1)
     num_blocks = convert(Int64,div(n,block_size)) + (convert(Bool,mod(n,block_size)) ? 1 : 0)
     d = reshape(vcat(diag(A),zeros(num_blocks*block_size-n)),block_size,num_blocks)    
-#    D = Array{Float64,2}[]
-#    for i=1:num_blocks
-#        push!(D,zeros(block_size,block_size))
-#        range_i = (i-1)*block_size+1:min(i*block_size,n)
-#        D[i] = A[range_i,range_i]
-#    end
     L = Array{Float64,2}[]
     piv = [1:num_blocks]
     error = sum(d)
-#    error2 = sum(map(trace,D))
-#    println("error-error2: ",error-error2)
     j = 1
     while error > tol
         idx = indmax(sum(d[:,piv[j:num_blocks]],1))+j-1
-#        idx2 = indmax(map(trace,D[piv[j:num_blocks]]))+j-1
-#        println("idx: ",idx)
-#        println("idx2: ",idx2)
         piv[j],piv[idx] = piv[idx],piv[j]
         lower_j = (piv[j]-1)*block_size+1
         upper_j = min(piv[j]*block_size,n)
         range_j = lower_j:upper_j
         block_size_j = upper_j-lower_j+1
         push!(L,zeros(n,block_size_j))
-#        Gd,_,_,_ = lapack_full_fact(D[piv[j]],1e-12)
-#        r2 = size(Gd,2)
-#        println("r2: ",r2)
-#        L[j][range_j,1:r] = G
         r = block_size
         for i=j:num_blocks
             lower_i = (piv[i]-1)*block_size+1
@@ -395,33 +469,75 @@ function blocked_full_fact_diag(A,tol,block_size)
                 L[k][range_i,1:block_size]*
                 L[k][range_j,1:block_size]'
             end
-#            println("size(S): ",size(S))
             if i==j
                 G,_,_,_ = lapack_full_fact(S,tol)
                 r = size(G,2)
-#                println("r: ",r)
             else
                 G = S/L[j][range_j,1:r]'
-#                D[piv[i]] -= G*G'
-#                println("i: ",i,", j: ",j)
-#                println("size(G): ",size(G))
-#                println("size(diag(G*G')): ",size(diag(G*G')))
                 d[1:block_size_i,piv[i]] -= 
                 [(G[m,:]*G[m,:]')[1] for m=1:block_size_i]
             end
             L[j][range_i,1:r] = G
         end
         error = sum(d[:,piv[j:num_blocks]])
-#        error2 = sum(map(trace,D[piv[j+1:num_blocks]]))
-#        println("error-error2: ",error-error2)
         j+=1
     end
     L2 = zeros(n,min(block_size*(j-1),n))
     for p=1:j-1
-#        upper_p = min(p*block_size,n)
         lower_p = (p-1)*block_size+1
-#        block_size_p = upper_p - lower_p + 1
         L2[:,lower_p:lower_p+size(L[p],2)-1] = L[p]
+    end
+    return L2,piv,0,0
+end
+
+function blocked_full_fact_diag_row_major(A,tol,block_size)
+    n = size(A,1)
+    num_blocks = convert(Int64,div(n,block_size)) + (convert(Bool,mod(n,block_size)) ? 1 : 0)
+    d = reshape(vcat(diag(A),zeros(num_blocks*block_size-n)),block_size,num_blocks)    
+    L = [Array{Float64,2}[] for i=1:num_blocks]
+    piv = [1:num_blocks]
+    error = sum(d)
+    j = 1
+    while error > tol
+        idx = indmax(sum(d[:,piv[j:num_blocks]],1))+j-1
+        piv[j],piv[idx] = piv[idx],piv[j]
+        lower_j = (piv[j]-1)*block_size+1
+        upper_j = min(piv[j]*block_size,n)
+        range_j = lower_j:upper_j
+        block_size_j = upper_j-lower_j+1
+        r = block_size
+        for i=j:num_blocks
+            lower_i = (piv[i]-1)*block_size+1
+            upper_i = min(piv[i]*block_size,n)
+            range_i = lower_i:upper_i
+            block_size_i = upper_i-lower_i+1
+            S = A[range_i,range_j]
+            for k=1:j-1
+                S -= L[piv[i]][k]*L[piv[j]][k]'
+            end
+            if i==j
+                G,_,_,_ = lapack_full_fact(S,tol)
+                r = size(G,2)
+            else
+                G = S/L[piv[j]][j]'
+                d[1:block_size_i,piv[i]] -= 
+                [(G[m,:]*G[m,:]')[1] for m=1:block_size_i]
+            end
+            push!(L[piv[i]],G)
+        end
+        error = sum(d[:,piv[j:num_blocks]])
+        j+=1
+    end
+    L2 = zeros(n,min(block_size*(j-1),n))
+    for jj=1:j-1
+        lower_j = (jj-1)*block_size+1
+        for ii=jj:num_blocks
+            lower_i = (piv[ii]-1)*block_size+1
+            block_size_i,block_size_j = size(L[piv[ii]][jj])
+            range_i = lower_i:min(lower_i+block_size_i-1,n)
+            range_j = lower_j:min(lower_j+block_size_j-1,n)
+            L2[range_i,range_j] = L[piv[ii]][jj]
+        end
     end
     return L2,piv,0,0
 end
@@ -832,8 +948,6 @@ function sorted_blocked_struct_fact(A,tol,block_size,nb)
     return L2, piv, fact_space, fact_fevals
 end
 
-
-
 function full_trans(L,piv,C)
     # Computes the factorized full transformation of A
     n,n = size(C)
@@ -849,6 +963,16 @@ function full_trans(L,piv,C)
     B3 = reshape(permutedims(reshape(B2,n,n,r),[2 1 3]),n^2,r)
     full_trans_space += n2*r
     return B3, full_trans_space
+end
+
+function half_trans(L,C)
+    # Computes the factorized full transformation of A
+    n,n = size(C)
+    n2,r = size(L)
+    B1 = C*reshape(L,n,n*r)
+    B2 = C*reshape(permutedims(reshape(B1,n,n,r),[2 1 3]),n,n*r)
+    B3 = reshape(permutedims(reshape(B2,n,n,r),[2 1 3]),n2,r)
+    return B3
 end
 
 function struct_fact(A,tol)
@@ -1348,7 +1472,7 @@ function lapack_full_fact(A,tol)
     Aout, piv, rank, info = LAPACK.pstrf!('L', A, tol)
     L = tril(Aout)
     L[piv,1:rank] = L[:,1:rank]
-    return L[:,1:rank], piv, 0, 0
+    return L[:,1:rank]
 end
 
 function lapack_struct_fact(Asym,tol)
@@ -1545,8 +1669,15 @@ function tune_blocked_facts()
     num_basis_fns = [34, 48, 68, 82, 123]
     ranks = [200, 300, 400, 500, 750]
     block_sizes = [32, 64, 96, 128, 192, 256, 384, 512]
-    nmols = 3
-    num_facts = 4
+    nmols = 2
+    facts = ["Blocked pivoted Cholesky (diagonal blocks, column-major)",
+             "Blocked pivoted Cholesky (diagonal, column-major)",
+             "LAPACK pstrf",
+             "Unfactorized transformation",
+             "Blocked pivoted Cholesky (diagonal blocks, row-major)",
+             "Blocked pivoted Cholesky (diagonal, row-major)"]
+    style = ["ro","bo","go","wo","r+","b+"]
+    num_facts = length(facts)
     timings = zeros(nmols,length(block_sizes),num_facts)
     for i=1:nmols
         nbf = num_basis_fns[i]
@@ -1554,51 +1685,185 @@ function tune_blocked_facts()
         r = ranks[i]
         C = randn(nbf,nbf)
         println("n: ",n)
+        A = randn(n,r)
+        A = A*A'
         for b = 1:length(block_sizes)
             nb = block_sizes[b]
             println("block size: ",nb)
-            A = randn(n,r)
-            A = A*A'
+
             # Blocked pivoted Cholesky (precompute diagonal blocks)
-            println("Blocked pivoted Cholesky (precompute diagonal blocks)")
+            println(facts[1])
             tic()
             L2, piv, full_fact_space, full_fact_fevals = blocked_full_fact(A,tol,nb)
             timings[i,b,1] = toc()
-            error = norm(A-L2*L2',1)
+            error = trace(A-L2*L2')
             println("Error: ", error)
+
             # Blocked pivoted Cholesky (precompute diagonal)
-            println("Blocked pivoted Cholesky (precompute diagonal)")
+            println(facts[2])
             tic()
             L2, piv, full_fact_space, full_fact_fevals = blocked_full_fact_diag(A,tol,nb)
             timings[i,b,2] = toc()
-            error = norm(A-L2*L2',1)
+            error = trace(A-L2*L2')
             println("Error: ", error)
+
             # LAPACK pstrf
-            println("LAPACK pstrf")
+            println(facts[3])
             Ain = deepcopy(A)
             tic()
             L2, piv, full_fact_space, full_fact_fevals = lapack_full_fact(Ain,tol)
             timings[i,b,3] = toc()
-            error = norm(A-L2*L2',1)
+            error = trace(A-L2*L2')
             println("Error: ", error)                         
+
             # Unfactorized transformation
-            println("Unfactorized transformation")
+            println(facts[4])
             tic()
             M = unfact_trans(A,C)
             timings[i,b,4] = toc()
             error = trace(kron(C,C)*A*kron(C,C)'-M)
             println("Error: ", error)
+
+            # Blocked pivoted Cholesky (precompute diagonal blocks, row-major)
+            println(facts[5])
+            tic()
+            L2, piv, full_fact_space, full_fact_fevals = blocked_full_fact_row_major(A,tol,nb)
+            timings[i,b,5] = toc()
+#            println("size(A[piv,piv]): ",size(A[piv,piv]))
+#            println("size(A[piv,piv]): ",size(L2*L2'))
+            error = trace(A-L2*L2')
+            println("Error: ", error)
+
+            # Blocked pivoted Cholesky (precompute diagonal, row-major)
+            println(facts[6])
+            tic()
+            L2, piv, full_fact_space, full_fact_fevals = blocked_full_fact_diag_row_major(A,tol,nb)
+            timings[i,b,6] = toc()
+#            error = trace(A[piv,piv]-L2*L2')
+#            println("Error: ", error)
         end
     end
-
+    
     for i=1:nmols
-        plotComparison4(block_sizes,vec(timings[i,:,1]),"Blocked pivoted Cholesky (diagonal blocks)",vec(timings[i,:,2]),"Blocked pivoted Cholesky (diagonal)",vec(timings[i,:,3]),"LAPACK pstrf",vec(timings[i,:,4]),"Unfactorized transformation","Block size","Time in seconds",string("Timings for ",molecules[i]))
+        figure()
+        for f=1:num_facts
+            if f == 3 || f == 4
+                plot(block_sizes,ones(length(block_sizes))*timings[i,1,f],style[f],label=facts[f])
+            else
+                plot(block_sizes,vec(timings[i,:,f]),style[f],label=facts[f])
+            end                
+        end
+        legend()
+        xlabel("Block size")
+        ylabel("Time in seconds")
+        title(string("Timings for ", molecules[i]))
+        savefig(string("Timings for ", molecules[i],".png"))
     end
 end
+
+function test_blocked_full_fact_row_major()
+    nbf = 34
+    nb = 32
+    n = nbf^2
+    r = 200
+    tol = 1e-6
+    C = randn(nbf,nbf)
+    println("n: ",n)
+    A = randn(n,r)
+    A = A*A'
+    tic()
+    L2, piv, full_fact_space, full_fact_fevals = blocked_full_fact_row_major(A,tol,nb)
+    toc()
+    error = trace(A-L2*L2')
+    println("Error: ", error)
+end
+
+function profile_facts()
+    tol = 1e-6
+    molecules = ["HF","NH3","H2O2","N2H4","C2H5OH"]
+    num_basis_fns = [34, 48, 68, 82, 123]
+    ranks = [200, 300, 400, 500, 750]
+    nmols = 2
+    routines = ["Unblocked Psi4 decomposition",
+                "LAPACK PSTRF decomposition",
+                "Cholesky factor transformation",
+                "Full tensor transformation"]
+    style = ["ro","bo","go","wo"]
+    num_routines = length(routines)
+    timings = zeros(nmols,num_routines)
+    for i=1:nmols
+        nbf = num_basis_fns[i]
+        n = nbf^2
+        r = ranks[i]
+        C = randn(nbf,nbf)
+        println("n: ",n)
+        A = randn(n,r)
+        A = A*A'
+
+        # Unblocked Psi4 decomposition
+        println(routines[1])
+        tic()
+        L = unblocked_psi4(A,tol)
+        timings[i,1] = toc()
+        error = trace(A-L*L')
+        println("Error: ", error)
+
+        # LAPACK PSTRF decomposition
+        println(routines[2])
+        Ain = deepcopy(A)
+        tic()
+        L = lapack_full_fact(Ain,tol)
+        timings[i,2] = toc()
+        error = trace(A-L*L')
+        println("Error: ", error)                         
+
+        # Cholesky factor transformation
+        println(routines[3])
+        tic()
+        G = half_trans(L,C)
+        timings[i,3] = toc()
+        error = trace(kron(C,C)*A*kron(C,C)'-G*G')
+        println("Error: ", error)
+
+        # Full tensor transformation
+        println(routines[4])
+        tic()
+        B = unfact_trans(A,C)
+        timings[i,4] = toc()
+        error = trace(kron(C,C)*A*kron(C,C)'-B)
+        println("Error: ", error)
+    end
+    
+    figure()
+    for r=1:num_routines
+        plot(num_basis_fns[1:nmols],timings[:,r],style[r],label=routines[r])
+    end
+    legend()
+    xlabel("Number of basis functions (n)")
+    ylabel("Time in seconds")
+    title("Profiling unblocked Psi4 decomposition")
+    savefig("Profiling unblocked Psi4 decomposition.png")
+end
+
+#        plotComparison4(block_sizes,vec(timings[i,:,1]),"Blocked pivoted Cholesky (diagonal blocks)",vec(timings[i,:,2]),"Blocked pivoted Cholesky (diagonal)",vec(timings[i,:,3]),"LAPACK pstrf",vec(timings[i,:,4]),"Unfactorized transformation","Block size","Time in seconds",string("Timings for ",molecules[i]))
+#function plotComparison4(x,y1,l1,y2,l2,y3,l3,y4,l4,xlab,ylab,titl)
+#    figure()
+#    plot(x,y1,"ro",label=l1)
+#    plot(x,y2,"bo",label=l2)
+#    plot(x,y3,"go",label=l3)
+#    plot(x,y4,"wo",label=l4)
+#    legend()
+#    xlabel(xlab)
+#    ylabel(ylab)
+#    title(titl)
+#    savefig(string(titl,".png"))
+#end
 
 #TestIntegralTransformation()
 #TestStructTransform()
 #TestDsptrfL()
 #test_facts()
 #test_blocked_pivoted_cholesky()
-tune_blocked_facts()
+#tune_blocked_facts()
+#test_blocked_full_fact_row_major()
+profile_facts()
