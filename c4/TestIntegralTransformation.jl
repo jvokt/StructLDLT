@@ -1669,7 +1669,7 @@ function tune_blocked_facts()
     num_basis_fns = [34, 48, 68, 82, 123]
     ranks = [200, 300, 400, 500, 750]
     block_sizes = [32, 64, 96, 128, 192, 256, 384, 512]
-    nmols = 2#length(molecules)
+    nmols = length(molecules)
 #    facts = ["Blocked pivoted Cholesky (diagonal blocks, column-major)",
     facts = ["Algorithm 4.1 with precomputing diagonal blocks",
 #             "Blocked pivoted Cholesky (diagonal, column-major)",
@@ -1786,7 +1786,7 @@ function profile_facts()
     molecules = ["HF","NH3","H2O2","N2H4","C2H5OH"]
     num_basis_fns = [34, 48, 68, 82, 123]
     ranks = [200, 300, 400, 500, 750]
-    nmols = 2
+    nmols = length(molecules)
     routines = ["Unblocked Psi4 decomposition",
                 "LAPACK PSTRF decomposition",
                 "Cholesky factor transformation",
