@@ -6,7 +6,7 @@ function tuned_algorithm()
     num_basis_fns = [34, 48, 68, 82, 123]
     ranks = [200, 300, 400, 500, 750]
     block_sizes = [64, 96, 96, 96, 64]
-    nmols = 2#length(molecules)
+    nmols = length(molecules)
     algs = ["Full tensor transformation",
             "Tuned Algorithm 4.1 plus Cholesky factor transform"]
     style = ["wo","go"]
@@ -43,16 +43,16 @@ function tuned_algorithm()
     legend()
     xlabel("n (number of basis functions)")
     ylabel("Time in seconds")
-    title("Timing state-of-the-art versus new tuned algorithm")
-    savefig(string("Timing state-of-the-art versus new tuned algorithm",".png"))
+    title("State-of-the-art versus new tuned algorithm timing")
+    savefig(string("State-of-the-art versus new tuned algorithm timing",".png"))
     figure()
     semilogy(num_basis_fns[1:nmols],full_errors,style[1],label=algs[1])
     semilogy(num_basis_fns[1:nmols],tuned_errors,style[2],label=algs[2])
     legend()
     xlabel("n (number of basis functions)")
     ylabel("Trace norm error")
-    title("Error for state-of-the-art versus new tuned algorithm")
-    savefig(string("Error for state-of-the-art versus new tuned algorithm",".png"))
+    title("State-of-the-art versus new tuned algorithm error")
+    savefig(string("State-of-the-art versus new tuned algorithm error",".png"))
 end
 
 function tune_memory_layout()
