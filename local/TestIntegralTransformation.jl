@@ -353,7 +353,7 @@ function blocked_full_fact(A,tol,block_size)
         range_j = lower_j:upper_j
         block_size_j = upper_j-lower_j+1
         push!(L,zeros(n,block_size_j))
-        G,_,_,_ = lapack_full_fact(D[piv[j]],tol)
+        G = lapack_full_fact(D[piv[j]],tol)
         r = size(G,2)
         L[j][range_j,1:r] = G
         for i=j+1:num_blocks
@@ -404,7 +404,7 @@ function blocked_full_fact_row_major(A,tol,block_size)
         upper_j = min(piv[j]*block_size,n)
         range_j = lower_j:upper_j
         block_size_j = upper_j-lower_j+1
-        G,_,_,_ = lapack_full_fact(D[piv[j]],tol)
+        G = lapack_full_fact(D[piv[j]],tol)
         r = size(G,2)
         # L[piv[j]][j] = G
         push!(L[piv[j]],G)
@@ -470,7 +470,7 @@ function blocked_full_fact_diag(A,tol,block_size)
                 L[k][range_j,1:block_size]'
             end
             if i==j
-                G,_,_,_ = lapack_full_fact(S,tol)
+                G = lapack_full_fact(S,tol)
                 r = size(G,2)
             else
                 G = S/L[j][range_j,1:r]'
@@ -516,7 +516,7 @@ function blocked_full_fact_diag_row_major(A,tol,block_size)
                 S -= L[piv[i]][k]*L[piv[j]][k]'
             end
             if i==j
-                G,_,_,_ = lapack_full_fact(S,tol)
+                G = lapack_full_fact(S,tol)
                 r = size(G,2)
             else
                 G = S/L[piv[j]][j]'
@@ -567,7 +567,7 @@ function blocked_struct_fact(A,tol,block_size,nb)
         range_j = lower_j:upper_j
         block_size_j = upper_j-lower_j+1
         push!(L,zeros(n,block_size_j))
-        G,_,_,_ = lapack_full_fact(D[piv[j]],1e-12)
+        G = lapack_full_fact(D[piv[j]],1e-12)
 #        println(size(G))
 #        println(size(range_j))
         r = size(G,2)
@@ -1671,7 +1671,8 @@ function tune_blocked_facts()
     block_sizes = [32, 64, 96, 128, 192, 256, 384, 512]
     nmols = 2
     facts = ["Blocked pivoted Cholesky (diagonal blocks, column-major)",
-             "Blocked pivoted Cholesky (diagonal, column-major)",
+#             "Blocked pivoted Cholesky (diagonal, column-major)",
+             "Algorithm 4.1",
              "LAPACK pstrf",
              "Unfactorized transformation",
              "Blocked pivoted Cholesky (diagonal blocks, row-major)",
@@ -1711,7 +1712,7 @@ function tune_blocked_facts()
             println(facts[3])
             Ain = deepcopy(A)
             tic()
-            L2, piv, full_fact_space, full_fact_fevals = lapack_full_fact(Ain,tol)
+            L2 = lapack_full_fact(Ain,tol)
             timings[i,b,3] = toc()
             error = trace(A-L2*L2')
             println("Error: ", error)                         
@@ -1739,14 +1740,15 @@ function tune_blocked_facts()
             tic()
             L2, piv, full_fact_space, full_fact_fevals = blocked_full_fact_diag_row_major(A,tol,nb)
             timings[i,b,6] = toc()
-#            error = trace(A[piv,piv]-L2*L2')
-#            println("Error: ", error)
+            error = trace(A-L2*L2')
+            println("Error: ", error)
         end
     end
     
     for i=1:nmols
         figure()
-        for f=1:num_facts
+#        for f=1:num_facts
+        for f=[2]
             if f == 3 || f == 4
                 plot(block_sizes,ones(length(block_sizes))*timings[i,1,f],style[f],label=facts[f])
             else
@@ -1756,8 +1758,8 @@ function tune_blocked_facts()
         legend()
         xlabel("Block size")
         ylabel("Time in seconds")
-        title(string("Timings for ", molecules[i]))
-        savefig(string("Timings for ", molecules[i],".png"))
+        title(string("Algorithm 4.1 timings for ", molecules[i]))
+        savefig(string("Algorithm 4.1 timings for ", molecules[i],".png"))
     end
 end
 
@@ -1864,6 +1866,6 @@ end
 #TestDsptrfL()
 #test_facts()
 #test_blocked_pivoted_cholesky()
-#tune_blocked_facts()
+tune_blocked_facts()
 #test_blocked_full_fact_row_major()
-profile_facts()
+#profile_facts()
