@@ -1669,8 +1669,9 @@ function tune_blocked_facts()
     num_basis_fns = [34, 48, 68, 82, 123]
     ranks = [200, 300, 400, 500, 750]
     block_sizes = [32, 64, 96, 128, 192, 256, 384, 512]
-    nmols = length(molecules)
-    facts = ["Blocked pivoted Cholesky (diagonal blocks, column-major)",
+    nmols = 2#length(molecules)
+#    facts = ["Blocked pivoted Cholesky (diagonal blocks, column-major)",
+    facts = ["Algorithm 4.1 with precomputing diagonal blocks",
 #             "Blocked pivoted Cholesky (diagonal, column-major)",
              "Algorithm 4.1",
              "LAPACK pstrf",
@@ -1695,10 +1696,10 @@ function tune_blocked_facts()
             # Blocked pivoted Cholesky (precompute diagonal blocks)
             println(facts[1])
             tic()
-#            L2, piv, full_fact_space, full_fact_fevals = blocked_full_fact(A,tol,nb)
+            L2, piv, full_fact_space, full_fact_fevals = blocked_full_fact(A,tol,nb)
             timings[i,b,1] = toc()
-#            error = trace(A-L2*L2')
-#            println("Error: ", error)
+            error = trace(A-L2*L2')
+            println("Error: ", error)
 
             # Blocked pivoted Cholesky (precompute diagonal)
             println(facts[2])
@@ -1748,7 +1749,7 @@ function tune_blocked_facts()
     for i=1:nmols
         figure()
 #        for f=1:num_facts
-        for f=[2]
+        for f=[1 2]
             if f == 3 || f == 4
                 plot(block_sizes,ones(length(block_sizes))*timings[i,1,f],style[f],label=facts[f])
             else
