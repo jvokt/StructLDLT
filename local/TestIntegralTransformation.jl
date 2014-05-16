@@ -1759,8 +1759,8 @@ function tune_blocked_facts()
         legend()
         xlabel("Block size")
         ylabel("Time in seconds")
-        title(string("Algorithm 4.1 timings for ", molecules[i]))
-        savefig(string("Algorithm 4.1 timings for ", molecules[i],".png"))
+        title(string("Algorithm 4.1 with precomputing diagonal blocks timings for ", molecules[i]))
+        savefig(string("Algorithm 4.1 with precomputing diagonal blockstimings for ", molecules[i],".png"))
     end
 end
 
