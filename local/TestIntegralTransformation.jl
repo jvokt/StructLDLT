@@ -1,5 +1,65 @@
 using PyPlot
 
+function tune_memory_layout()
+    tol = 1e-6
+    molecules = ["HF","NH3","H2O2","N2H4","C2H5OH"]
+    num_basis_fns = [34, 48, 68, 82, 123]
+    ranks = [200, 300, 400, 500, 750]
+    block_sizes = [32, 64, 96, 128, 192, 256, 384, 512]
+    nmols = 2#length(molecules)
+    facts = ["Algorithm 4.1, diagonal blocks",
+             "Algorithm 4.1",
+             "Algorithm 4.1, diagonal blocks, row-major block order",
+             "Algorithm 4.1, row-major block order"]
+    style = ["ro","bo","go","wo"]
+    num_facts = length(facts)
+    timings = zeros(nmols,length(block_sizes),num_facts)
+    for i=1:nmols
+        nbf = num_basis_fns[i]
+        n = nbf^2
+        r = ranks[i]
+        println("n: ",n)
+        A = randn(n,r)
+        A = A*A'
+        for b = 1:length(block_sizes)
+            nb = block_sizes[b]
+            println("block size: ",nb)
+
+            # Blocked pivoted Cholesky (precompute diagonal blocks)
+            tic()
+            L2, piv, full_fact_space, full_fact_fevals = blocked_full_fact(A,tol,nb)
+            timings[i,b,1] = toc()
+
+            # Blocked pivoted Cholesky (precompute diagonal)
+            tic()
+            L2, piv, full_fact_space, full_fact_fevals = blocked_full_fact_diag(A,tol,nb)
+            timings[i,b,2] = toc()
+
+            # Blocked pivoted Cholesky (precompute diagonal blocks, row-major)
+            tic()
+            L2, piv, full_fact_space, full_fact_fevals = blocked_full_fact_row_major(A,tol,nb)
+            timings[i,b,3] = toc()
+
+            # Blocked pivoted Cholesky (precompute diagonal, row-major)
+            tic()
+            L2, piv, full_fact_space, full_fact_fevals = blocked_full_fact_diag_row_major(A,tol,nb)
+            timings[i,b,4] = toc()
+        end
+    end
+    
+    for i=1:nmols
+        figure()
+        for f=1:num_facts
+            plot(block_sizes,vec(timings[i,:,f]),style[f],label=facts[f])
+        end
+        legend()
+        xlabel("Block size")
+        ylabel("Time in seconds")
+        title(string("All timings for ", molecules[i]))
+        savefig(string("All timings for ", molecules[i],".png"))
+    end
+end
+
 function TestIntegralTransformation()
 
     molecules = ["HF","NH3","H2O2","N2H4","C2H5OH"]
@@ -1867,6 +1927,7 @@ end
 #TestDsptrfL()
 #test_facts()
 #test_blocked_pivoted_cholesky()
-tune_blocked_facts()
+#tune_blocked_facts()
 #test_blocked_full_fact_row_major()
 #profile_facts()
+tune_memory_layout()
