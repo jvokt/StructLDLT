@@ -1,5 +1,60 @@
 using PyPlot
 
+function tuned_algorithm()
+    tol = 1e-6
+    molecules = ["HF","NH3","H2O2","N2H4","C2H5OH"]
+    num_basis_fns = [34, 48, 68, 82, 123]
+    ranks = [200, 300, 400, 500, 750]
+    block_sizes = [64, 96, 96, 96, 64]
+    nmols = 2#length(molecules)
+    algs = ["Full tensor transformation",
+            "Tuned Algorithm 4.1 plus Cholesky factor transform"]
+    style = ["wo","go"]
+    full_timings = zeros(nmols)
+    tuned_timings = zeros(nmols)
+    full_errors = zeros(nmols)
+    tuned_errors = zeros(nmols)
+    for i=1:nmols
+        nbf = num_basis_fns[i]
+        n = nbf^2
+        r = ranks[i]
+        nb = block_sizes[i]
+        println("n: ",n)
+        A = randn(n,r)
+        A = A*A'
+        C = randn(nbf,nbf)
+        tic()
+        M = unfact_trans(A,C)
+        full_timings[i] = toc()
+        full_errors[i] = trace(kron(C,C)*A*kron(C,C)'-M)
+        println("Error: ",full_errors[i])
+        
+        tic()
+        L = blocked_full_fact_row_major(A,tol,nb)
+        G = half_trans(L,C)
+        tuned_timings[i] = toc()
+        tuned_errors[i] = trace(kron(C,C)*A*kron(C,C)'-G*G')
+        println("Error: ", tuned_errors[i])
+    end
+    
+    figure()
+    plot(num_basis_fns[1:nmols],full_timings,style[1],label=algs[1])
+    plot(num_basis_fns[1:nmols],tuned_timings,style[2],label=algs[2])
+    legend()
+    xlabel("n (number of basis functions)")
+    ylabel("Time in seconds")
+    title("Timing state-of-the-art versus new tuned algorithm")
+    savefig(string("Timing state-of-the-art versus new tuned algorithm",".png"))
+    figure()
+    semilogy(num_basis_fns[1:nmols],full_errors,style[1],label=algs[1])
+    semilogy(num_basis_fns[1:nmols],tuned_errors,style[2],label=algs[2])
+    legend()
+    xlabel("n (number of basis functions)")
+    ylabel("Trace norm error")
+    title("Error for state-of-the-art versus new tuned algorithm")
+    savefig(string("Error for state-of-the-art versus new tuned algorithm",".png"))
+end
+
 function tune_memory_layout()
     tol = 1e-6
     molecules = ["HF","NH3","H2O2","N2H4","C2H5OH"]
@@ -498,7 +553,7 @@ function blocked_full_fact_row_major(A,tol,block_size)
             L2[range_i,range_j] = L[piv[ii]][jj]
         end
     end
-    return L2,piv,0,0
+    return L2
 end
 
 function blocked_full_fact_diag(A,tol,block_size)
@@ -1930,4 +1985,5 @@ end
 #tune_blocked_facts()
 #test_blocked_full_fact_row_major()
 #profile_facts()
-tune_memory_layout()
+#tune_memory_layout()
+tuned_algorithm()
