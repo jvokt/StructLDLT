@@ -6,7 +6,7 @@ function tune_memory_layout()
     num_basis_fns = [34, 48, 68, 82, 123]
     ranks = [200, 300, 400, 500, 750]
     block_sizes = [32, 64, 96, 128, 192, 256, 384, 512]
-    nmols = 2#length(molecules)
+    nmols = length(molecules)
     facts = ["Algorithm 4.1, diagonal blocks",
              "Algorithm 4.1",
              "Algorithm 4.1, diagonal blocks, row-major block order",
