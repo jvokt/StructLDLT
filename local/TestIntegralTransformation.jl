@@ -1669,7 +1669,7 @@ function tune_blocked_facts()
     num_basis_fns = [34, 48, 68, 82, 123]
     ranks = [200, 300, 400, 500, 750]
     block_sizes = [32, 64, 96, 128, 192, 256, 384, 512]
-    nmols = 2
+    nmols = length(molecules)
     facts = ["Blocked pivoted Cholesky (diagonal blocks, column-major)",
 #             "Blocked pivoted Cholesky (diagonal, column-major)",
              "Algorithm 4.1",
@@ -1695,10 +1695,10 @@ function tune_blocked_facts()
             # Blocked pivoted Cholesky (precompute diagonal blocks)
             println(facts[1])
             tic()
-            L2, piv, full_fact_space, full_fact_fevals = blocked_full_fact(A,tol,nb)
+#            L2, piv, full_fact_space, full_fact_fevals = blocked_full_fact(A,tol,nb)
             timings[i,b,1] = toc()
-            error = trace(A-L2*L2')
-            println("Error: ", error)
+#            error = trace(A-L2*L2')
+#            println("Error: ", error)
 
             # Blocked pivoted Cholesky (precompute diagonal)
             println(facts[2])
@@ -1710,38 +1710,38 @@ function tune_blocked_facts()
 
             # LAPACK pstrf
             println(facts[3])
-            Ain = deepcopy(A)
+ #           Ain = deepcopy(A)
             tic()
-            L2 = lapack_full_fact(Ain,tol)
+ #           L2 = lapack_full_fact(Ain,tol)
             timings[i,b,3] = toc()
-            error = trace(A-L2*L2')
-            println("Error: ", error)                         
+ #           error = trace(A-L2*L2')
+ #           println("Error: ", error)                         
 
             # Unfactorized transformation
             println(facts[4])
             tic()
-            M = unfact_trans(A,C)
+#            M = unfact_trans(A,C)
             timings[i,b,4] = toc()
-            error = trace(kron(C,C)*A*kron(C,C)'-M)
-            println("Error: ", error)
+#            error = trace(kron(C,C)*A*kron(C,C)'-M)
+#            println("Error: ", error)
 
             # Blocked pivoted Cholesky (precompute diagonal blocks, row-major)
             println(facts[5])
             tic()
-            L2, piv, full_fact_space, full_fact_fevals = blocked_full_fact_row_major(A,tol,nb)
+ #           L2, piv, full_fact_space, full_fact_fevals = blocked_full_fact_row_major(A,tol,nb)
             timings[i,b,5] = toc()
 #            println("size(A[piv,piv]): ",size(A[piv,piv]))
 #            println("size(A[piv,piv]): ",size(L2*L2'))
-            error = trace(A-L2*L2')
-            println("Error: ", error)
+#            error = trace(A-L2*L2')
+#            println("Error: ", error)
 
             # Blocked pivoted Cholesky (precompute diagonal, row-major)
             println(facts[6])
             tic()
-            L2, piv, full_fact_space, full_fact_fevals = blocked_full_fact_diag_row_major(A,tol,nb)
+#            L2, piv, full_fact_space, full_fact_fevals = blocked_full_fact_diag_row_major(A,tol,nb)
             timings[i,b,6] = toc()
-            error = trace(A-L2*L2')
-            println("Error: ", error)
+#            error = trace(A-L2*L2')
+#            println("Error: ", error)
         end
     end
     
