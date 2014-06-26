@@ -1,0 +1,84 @@
+n: 500, r: 500.0, f: 0
+elapsed time: 0.045410438 seconds
+elapsed time: 0.006197965 seconds
+n: 500, r: 500.0, f: 1
+elapsed time: 0.055049219 seconds
+elapsed time: 0.006258905 seconds
+n: 500, r: 250.0, f: 0
+elapsed time: 0.030185314 seconds
+elapsed time: 0.004765569 seconds
+n: 500, r: 250.0, f: 1
+elapsed time: 0.030435592 seconds
+elapsed time: 0.004717854 seconds
+n: 500, r: 50.0, f: 0
+elapsed time: 0.017051827 seconds
+elapsed time: 0.004468973 seconds
+n: 500, r: 50.0, f: 1
+elapsed time: 0.002642947 seconds
+elapsed time: 0.004411725 seconds
+n: 1000, r: 1000.0, f: 0
+elapsed time: 0.314854451 seconds
+elapsed time: 0.054109946 seconds
+n: 1000, r: 1000.0, f: 1
+elapsed time: 0.297751516 seconds
+elapsed time: 0.039624222 seconds
+n: 1000, r: 500.0, f: 0
+elapsed time: 0.255127398 seconds
+elapsed time: 0.028378751 seconds
+n: 1000, r: 500.0, f: 1
+elapsed time: 0.257380324 seconds
+elapsed time: 0.028328888 seconds
+n: 1000, r: 100.0, f: 0
+elapsed time: 0.070027959 seconds
+elapsed time: 0.018756396 seconds
+n: 1000, r: 100.0, f: 1
+elapsed time: 0.070301377 seconds
+elapsed time: 0.018841392 seconds
+n: 1500, r: 1500.0, f: 0
+elapsed time: 0.997249386 seconds
+elapsed time: 0.122346969 seconds
+n: 1500, r: 1500.0, f: 1
+elapsed time: 0.997958503 seconds
+elapsed time: 0.122386758 seconds
+n: 1500, r: 750.0, f: 0
+elapsed time: 0.830623082 seconds
+elapsed time: 0.092303132 seconds
+n: 1500, r: 750.0, f: 1
+elapsed time: 0.837052904 seconds
+elapsed time: 0.085486201 seconds
+n: 1500, r: 150.0, f: 0
+elapsed time: 0.246309029 seconds
+elapsed time: 0.071120556 seconds
+n: 1500, r: 150.0, f: 1
+elapsed time: 0.240500704 seconds
+elapsed time: 0.056735865 seconds
+n: 2000, r: 2000.0, f: 0
+elapsed time: 2.287766646 seconds
+elapsed time: 0.303574922 seconds
+n: 2000, r: 2000.0, f: 1
+elapsed time: 2.278882283 seconds
+elapsed time: 0.303255236 seconds
+n: 2000, r: 1000.0, f: 0
+elapsed time: 1.898993186 seconds
+elapsed time: 0.205442061 seconds
+n: 2000, r: 1000.0, f: 1
+elapsed time: 1.934740503 seconds
+elapsed time: 0.219418306 seconds
+n: 2000, r: 200.0, f: 0
+elapsed time: 0.590790913 seconds
+elapsed time: 0.106237523 seconds
+n: 2000, r: 200.0, f: 1
+elapsed time: 0.593804053 seconds
+elapsed time: 0.10482628 seconds
+4x3x2 Array{Float64,3}:
+[:, :, 1] =
+ 7.32667  6.33404  3.8156 
+ 5.81879  8.99009  3.73355
+ 8.15099  8.99886  3.46326
+ 7.53609  9.24345  5.56104
+
+[:, :, 2] =
+ 8.79534  6.45115  0.599073
+ 7.51438  9.08544  3.73122 
+ 8.15414  9.79167  4.23895 
+ 7.51473  8.81759  5.66465 
