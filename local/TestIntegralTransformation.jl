@@ -804,6 +804,19 @@ function blocked_full_fact3(A,tol,block_size)
     return L2, piv, full_fact_space, full_fact_fevals
 end
 
+function symmat(A)                                       
+    n2 = size(A,1)
+    n = convert(Int64,sqrt(n2))
+    nsym = convert(Int64,n*(n+1)/2)
+    Q = Qnn(n)
+    Qsym = Q[:,1:nsym]
+    if A == A'
+        return struct_block(A,1,1,nsym,nsym)
+    else
+        return Qsym'*A*Qsym
+    end
+end
+
 function struct_block(A,lower_i,lower_j,block_size_i,block_size_j)
     # Evaluates a column of Asym = Qsym'*A*Qsym
     n2,n2 = size(A)
@@ -1963,19 +1976,18 @@ function profile_facts()
     savefig("Profiling unblocked Psi4 decomposition.png")
 end
 
-#        plotComparison4(block_sizes,vec(timings[i,:,1]),"Blocked pivoted Cholesky (diagonal blocks)",vec(timings[i,:,2]),"Blocked pivoted Cholesky (diagonal)",vec(timings[i,:,3]),"LAPACK pstrf",vec(timings[i,:,4]),"Unfactorized transformation","Block size","Time in seconds",string("Timings for ",molecules[i]))
-#function plotComparison4(x,y1,l1,y2,l2,y3,l3,y4,l4,xlab,ylab,titl)
-#    figure()
-#    plot(x,y1,"ro",label=l1)
-#    plot(x,y2,"bo",label=l2)
-#    plot(x,y3,"go",label=l3)
-#    plot(x,y4,"wo",label=l4)
-#    legend()
-#    xlabel(xlab)
-#    ylabel(ylab)
-#    title(titl)
-#    savefig(string(titl,".png"))
-#end
+function gen_mol_data(molecule)
+    # Generate "molecule".dat from Psi4
+    
+end
+
+function parse_data_gen_ten(molecule)
+    # Parse "molecule".dat for two-electron integrals, generate "molecule".ten
+end
+
+function read_ten_unfold_plot(molecule)
+    # Read "molecule".ten into a tensor, unfold as a matrix, plot eigenvalues
+end
 
 #TestIntegralTransformation()
 #TestStructTransform()
@@ -1986,4 +1998,4 @@ end
 #test_blocked_full_fact_row_major()
 #profile_facts()
 #tune_memory_layout()
-tuned_algorithm()
+#tuned_algorithm()
