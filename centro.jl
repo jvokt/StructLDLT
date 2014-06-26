@@ -74,6 +74,13 @@ function RandCentro(n,r,f)
     return A
 end
 
+function lapack_chol(A,tol)
+    Aout, piv, rank, info = LAPACK.pstrf!('L', A, tol)
+    L = tril(Aout)
+    L[piv,1:rank] = L[:,1:rank]
+    return L[:,1:rank]
+end
+
 function UnStructCentro(A,tol,block_size)
     n = size(A,1)
     num_blocks = convert(Int64,div(n,block_size)) + (convert(Bool,mod(n,block_size)) ? 1 : 0)
@@ -93,7 +100,7 @@ function UnStructCentro(A,tol,block_size)
         upper_j = min(piv[j]*block_size,n)
         range_j = lower_j:upper_j
         block_size_j = upper_j-lower_j+1
-        G = lapack_full_fact(D[piv[j]],tol)
+        G = lapack_chol(D[piv[j]],tol)
         r = size(G,2)
         # L[piv[j]][j] = G
         push!(L[piv[j]],G)
