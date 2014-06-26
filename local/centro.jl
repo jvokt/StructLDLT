@@ -53,6 +53,13 @@ function lapack_chol(A,tol)
 end
 
 function UnStructCentro(A,tol,block_size)
+    Aout, piv, rank, info = LAPACK.pstrf!('L', A, tol)
+    L = tril(Aout)
+    L[piv,1:rank] = L[:,1:rank]
+    return L[:,1:rank]
+end
+
+function UnStructCentro2(A,tol,block_size)
     n = size(A,1)
     num_blocks = convert(Int64,div(n,block_size)) + (convert(Bool,mod(n,block_size)) ? 1 : 0)
     D = Array{Float64,2}[]
