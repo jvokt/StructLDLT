@@ -15,7 +15,7 @@ function SizeRankVersusSpeedup()
             for f = [0,1]
                 A = RandCentro(n_range[n],r_range[r],f)
                 tic()
-                L = UnStructCentro(A,tol)
+                L = UnStructCentro(A,tol,192)
                 unstruct_times[n,r,f+1] = toc()
                 tic()
                 Lp,Lm = StructCentro(A,tol)
