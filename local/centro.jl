@@ -5,66 +5,37 @@ function SizeRankVersusSpeedup()
     tol = 1e-6
 
     n_range = [500, 1000, 1500, 2000]
-#    n_range = [1500, 1500, 1500, 1500]
-    unstruct_times = zeros(4,3,2)
-    struct_times = zeros(4,3,2)
-
-    for n = 1:length(n_range)
+    unstruct_times = zeros(length(n_range),3,2)
+    struct_times = zeros(length(n_range),3,2)
+    for n_i = 1:length(n_range)
+        n = n_range[n_i]
         r_range = [n, n/2, n/10]
-        for r = 1:length(r_range)
-            for f = [0,1]
-                A = RandCentro(n_range[n],r_range[r],f)
+        for r_i = 1:length(r_range)
+            r = r_range[r_i]
+            f_range = [0,1]
+            for f_i = 1:length(f_range)
+                f = f_range[f_i]
+                println("n: ",n,", r: ",r,", f: ",f)
+                A = RandCentro(n,r,f)
                 tic()
                 L = UnStructCentro(A,tol,192)
-                unstruct_times[n,r,f+1] = toc()
+                unstruct_times[n_i,r_i,f_i] = toc()
                 tic()
                 Lp,Lm = StructCentro(A,tol)
-                struct_times[n,r,f+1] = toc()
+                struct_times[n_i,r_i,f_i] = toc()
             end
         end
     end
-
-display(unstruct_times)
-display(struct_times)
-display(unstruct_times./struct_times)
-
-#    display(unstruct_times)
-#    println()
-#    display(mean(
-#                 filter(
-#                     x -> x < 1 ? 0 : x,
-#                     unstruct_times),[1 2]
-#                 )
-#            )
-#    println()
-#    display(struct_times)
-#    println()
-#    display(mean(
-#                 filter(
-#                     x -> x < 1 ? 0.0 : x,struct_times),[1 2]
-#                 )
-#            )
-#    println()
-#    display(unstruct_times./struct_times)
-#    println()
-#    println(mean(
-#                 filter(
-#                     x -> x > 1,vec(unstruct_times[:,:,1])./vec(struct_times[:,:,1]))
-#                 )
-#            )
-#    println(mean(
-#                 filter(
-#                    x -> x > 1,vec(unstruct_times[:,:,2])./vec(struct_times[:,:,2]))
-#                 )
-#            )
+    display(unstruct_times./struct_times)
 end
 
 function RandCentro(n,r,f)
     # Returns a rank-r matrix with Centrosymmetry
     A = zeros(n,n)
+    m = convert(Int64,n/2)
     for i=1:r
         v = randn(n,1)
-        if f == 1 && mod(i,2) == 0
+        if (n == r && mod(i,2) == 0) || (n > r && f == 1 && mod(i,2) == 0)
             v -= v[n:-1:1]
         else
             v += v[n:-1:1]
@@ -137,63 +108,43 @@ function UnStructCentro(A,tol,block_size)
     return L2
 end
 
-
-#function UnStructCentro(A,tol)
-#    # Computes rank-revealing Cholesky factorization of A
-#    Aout, piv, rank, info = LAPACK.pstrf!('L', A, tol)
-##    L = tril(Aout)
-#    L[piv,1:rank] = L[:,1:rank]
-#    return L[:,1:rank]
-#    return Aout
-#end
-
 function StructCentro(A,tol)
     # Computes the rank-revealing Cholesky factorization of A, utilizing Centrosymmetric structure
     n = size(A,1)
-#    if mod(n,2) == 0
     m = convert(Int64,n/2)
     A11 = A[1:m,1:m]
     A12 = A[1:m,m+1:n]
-#        Aout = 0
-#        E = eye(m,m)[:,m:-1:1]
-#    B11 = A11 + A12[:,m:-1:1]
-#    Aout, piv, rank1, info = LAPACK.pstrf!('L', A11, tol)
+    B11 = A11 + A12[:,m:-1:1]
     L1 = UnStructCentro(A11,tol,192)
-#        Aout, piv, rank1, info = LAPACK.pstrf!('L', A11, tol)
-#        Aout, piv, rank1, info = LAPACK.pstrf!('L', A12, tol)
-        
-#        L1 = tril(Aout)
-#        L1[piv,1:rank1] = L1[:,1:rank1]
-#    B22 = A11 - A12[:,m:-1:1]
+    B22 = A11 - A12[:,m:-1:1]
     L2 = UnStructCentro(A12,tol,192)
-#    Aout, piv, rank2, info = LAPACK.pstrf!('L', A12, tol)
-#        L2 = tril(Aout)
-#        L2[piv,1:rank2] = L2[:,1:rank2]
-#    end
-#    return L1[:,1:rank1], L2[:,1:rank2]
-#    return Aout,Aout
-    return 0,1
+    return L1,L2
 end
 
 function TestRank()
-    ranks = zeros(4,3,2)
-    n_range = [500, 1000, 1500, 2000]
-    for n = 1:4
+    ranks = zeros(4,3,2,2)
+    n_range = [500]#, 1000, 1500, 2000]
+    for n_i = 1:length(n_range)
+        n = n_range[n_i]
         r_range = [n, n/2, n/10]
-        for r = 1:3
-            A = RandCentro(n_range[n],r_range[r])
-            m = convert(Int64,n_range[n]/2)
-            A11 = A[1:m,1:m]
-            A12 = A[1:m,m+1:n_range[n]]
-            B11 = A11 + A12[:,m:-1:1]
-            display(B11)
-            ranks[n,r,1] = rank(B11)
-            B22 = A11 - A12[:,m:-1:1]
-            display(B22)
-            ranks[n,r,2] = rank(B22)
+        for r_i = 1:length(r_range)
+            r = r_range[r_i]
+            f_range = [0,1]
+            for f_i = 1:length(f_range)
+                f = f_range[f_i]
+                println("n: ",n,", r: ",r,", f: ",f)
+                A = RandCentro(n,r,f)
+                m = convert(Int64,n/2)
+                A11 = A[1:m,1:m]
+                A12 = A[1:m,m+1:n]
+                B11 = A11 + A12[:,m:-1:1]
+                println("rank(B11): ", rank(B11))
+                B22 = A11 - A12[:,m:-1:1]
+                println("rank(B22): ",rank(B22))
+            end
         end
     end
-    display(ranks)
 end
 
 SizeRankVersusSpeedup()
+#TestRank()
