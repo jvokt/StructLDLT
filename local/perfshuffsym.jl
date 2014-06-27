@@ -165,9 +165,11 @@ function StructPerfShuff(A,tol)
     n2 = size(A,1)
     n = convert(Int64,sqrt(n2))
     nsym = convert(Int64,n*(n+1)/2)
-    B11 = struct_block(A,1,1,nsym,nsym)
+#    B11 = struct_block(A,1,1,nsym,nsym)
+    B11 = A[1:nsym,1:nsym]
     L1 = UnStructPerfShuff(B11,tol,192)
-    B22 = struct_block(A,1,1,nsym,nsym)
+#    B22 = struct_block(A,1,1,nsym,nsym)
+    B22 = A[nsym+1:n2,nsym+1:n2]
     L2 = UnStructPerfShuff(B22,tol,192)
     return L1,L2
 end
