@@ -1,6 +1,6 @@
 function SizeRankVersusSpeedup()
     # table of n = 500, 1000, 1500, 2000; r = n, n/2, n/10; f = 0, 1
-    # ratio of L = UnStructCentro(A) divided by L1,L2 = StructCentro(A)
+    # ratio of L = UnStructCentro(A) time divided by L1,L2 = StructCentro(A) time
 
     tol = 1e-6
     trials = 50
@@ -15,24 +15,31 @@ function SizeRankVersusSpeedup()
             println("n: ",n,", r1: ",r1,", r2: ",r2)
             for t_i = 1:trials
                 A = RandCentro(n,r1,r2)
-                Acopy = deepcopy(A)
-                tic()
-                L = UnStructCentro(Acopy,tol)
-                unstruct_times[n_i,r_i,t_i] = toc()
-                println("error: ",norm(A-L*L'))
+                L = deepcopy(A)
+                tic() # <- start
+                L,piv,rank,_ = LAPACK.pstrf!('L', L, tol)
+                unstruct_times[n_i,r_i,t_i] = toc() # <- stop
+                L[piv,:] = tril(L)
+                G = L[:,1:rank]
+                println("error: ",norm(A-G*G'))
+                # L = UnStructCentro(Acopy,tol)
                 
                 m = convert(Int64,n/2)
                 A11 = A[1:m,1:m]
                 A12 = A[1:m,m+1:n]
-                B11 = A11 + A12[:,m:-1:1]
-                B22 = A11 - A12[:,m:-1:1]
-                tic()
-                L1 = UnStructCentro(B11,tol)
-                L2 = UnStructCentro(B22,tol)
-                struct_times[n_i,r_i,t_i] = toc()
-                G1 = [L1; L1[m:-1:1,:]]/sqrt(2)
-                G2 = [L2; -L2[m:-1:1,:]]/sqrt(2)
+                B1 = A11 + A12[:,m:-1:1]
+                B2 = A11 - A12[:,m:-1:1]
+                tic() # <- start
+                B1,piv1,rank1,_ = LAPACK.pstrf!('L', B1, tol)
+                B2,piv2,rank2,_ = LAPACK.pstrf!('L', B2, tol)
+                struct_times[n_i,r_i,t_i] = toc() # <- stop
+                B1[piv1,:] = tril(B1)
+                B2[piv2,:] = tril(B2)
+                G1 = [B1[:,1:rank1]; B1[m:-1:1,1:rank1]]/sqrt(2)
+                G2 = [B2[:,1:rank2]; -B2[m:-1:1,1:rank2]]/sqrt(2)
                 println("error: ",norm(A-G1*G1'-G2*G2'))
+                # L1 = UnStructPerfShuff(Asym,tol)
+                # L2 = UnStructPerfShuff(Askew,tol)
             end
         end
     end
