@@ -35,7 +35,7 @@ function RandCentro(n,r,f)
     m = convert(Int64,n/2)
     for i=1:r
         v = randn(n,1)
-        if (n == r && mod(i,2) == 0) || (n > r && f == 1 && mod(i,2) == 0)
+        if (r > m && mod(i,2) == 0) || (r <= m && f == 1 && mod(i,2) == 0)
             v -= v[n:-1:1]
         else
             v += v[n:-1:1]
@@ -153,5 +153,5 @@ function TestRank()
     end
 end
 
-SizeRankVersusSpeedup()
-#TestRank()
+#SizeRankVersusSpeedup()
+TestRank()
