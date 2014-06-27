@@ -3,24 +3,22 @@ function SizeRankVersusSpeedup()
     # ratio of L = UnStructCentro(A) divided by L1,L2 = StructCentro(A)
 
     tol = 1e-6
-
+    trials = 50
     n_range = [500, 1000, 1500, 2000]
-    unstruct_times = zeros(length(n_range),3,2)
-    struct_times = zeros(length(n_range),3,2)
+    unstruct_times = zeros(length(n_range),5,trials)
+    struct_times = zeros(length(n_range),5,trials)
     for n_i = 1:length(n_range)
         n = n_range[n_i]
-        r_range = [n, n/2, n/10]
+        r_range = [(n/2,n/2), (n/2,n/10), (n/2,0), (n/100,n/100), (n/100,0)]
         for r_i = 1:length(r_range)
-            r = r_range[r_i]
-            f_range = [0,1]
-            for f_i = 1:length(f_range)
-                f = f_range[f_i]
-                println("n: ",n,", r: ",r,", f: ",f)
-                A = RandCentro(n,r,f)
+            r1,r2 = r_range[r_i]
+            println("n: ",n,", r1: ",r1,", r2: ",r2)
+            for t_i = 1:trials
+                A = RandCentro(n,r1,r2)
                 Acopy = deepcopy(A)
                 tic()
                 L = UnStructCentro(Acopy,tol)
-                unstruct_times[n_i,r_i,f_i] = toc()
+                unstruct_times[n_i,r_i,t_i] = toc()
                 println("error: ",norm(A-L*L'))
                 
                 m = convert(Int64,n/2)
@@ -31,27 +29,29 @@ function SizeRankVersusSpeedup()
                 tic()
                 L1 = UnStructCentro(B11,tol)
                 L2 = UnStructCentro(B22,tol)
-                struct_times[n_i,r_i,f_i] = toc()
+                struct_times[n_i,r_i,t_i] = toc()
                 G1 = [L1; L1[m:-1:1,:]]/sqrt(2)
                 G2 = [L2; -L2[m:-1:1,:]]/sqrt(2)
                 println("error: ",norm(A-G1*G1'-G2*G2'))
             end
         end
     end
-    display(unstruct_times./struct_times)
+    display(mean(unstruct_times,3)./mean(struct_times,3))
+    println()
+    display(mean(unstruct_times./struct_times,3))
 end
 
-function RandCentro(n,r,f)
+function RandCentro(n,r1,r2)
     # Returns a rank-r matrix with Centrosymmetry
     A = zeros(n,n)
-    m = convert(Int64,n/2)
-    for i=1:r
+    for i=1:r1
         v = randn(n,1)
-        if (r > m && mod(i,2) == 0) || (r <= m && f == 1 && mod(i,2) == 0)
-            v -= v[n:-1:1]
-        else
-            v += v[n:-1:1]
-        end
+        v += v[n:-1:1]
+        A += v*v'
+    end
+    for i=1:r2
+        v = randn(n,1)
+        v -= v[n:-1:1]
         A += v*v'
     end
     return A
