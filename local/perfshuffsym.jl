@@ -4,7 +4,7 @@ function SizeRankVersusSpeedup()
 
     tol = 1e-6
     trials = 50
-    n_range = [20, 40, 60, 80, 100]
+    n_range = [20, 40, 60, 80]#, 100]
     unstruct_times = zeros(length(n_range),5,trials)
     struct_times = zeros(length(n_range),5,trials)
     for n_i = 1:length(n_range)
