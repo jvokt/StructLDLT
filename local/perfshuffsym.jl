@@ -209,5 +209,19 @@ function TestRank()
     end
 end
 
+function TestPerfShuffSymmetries()
+    P = eye(9,9)[:,PerfShuff(3,3)]
+    A = randn(n,n)
+    A = A + A'
+    A = A + P*A*P
+    T_A = reshape(A,3,3,3,3)
+    B = RandPerfShuffSym(3,6,0)
+    T_B = reshape(B,3,3,3,3)
+    for p in permutations([1 2 3 4])
+        println(norm(vec(T_A-permutedims(T_A,p))))
+    end
+    
+end
+
 SizeRankVersusSpeedup()
 #TestRank()

@@ -1,6 +1,6 @@
 function SizeRankVersusSpeedup()
     # table of n = 500, 1000, 1500, 2000; r = n, n/2, n/10; f = 0, 1
-    # ratio of [L,D,P] = UnStructCentro(A) divided by [Lp,Dp,Pp,Lm,Dm,Pm] = StructCentro(A)
+    # ratio of L = UnStructCentro(A) divided by L1,L2 = StructCentro(A)
 
     tol = 1e-6
 
@@ -17,12 +17,24 @@ function SizeRankVersusSpeedup()
                 f = f_range[f_i]
                 println("n: ",n,", r: ",r,", f: ",f)
                 A = RandCentro(n,r,f)
+                Acopy = deepcopy(A)
                 tic()
-                L = UnStructCentro(A,tol,192)
+                L = UnStructCentro(Acopy,tol)
                 unstruct_times[n_i,r_i,f_i] = toc()
+                println("error: ",norm(A-L*L'))
+                
+                m = convert(Int64,n/2)
+                A11 = A[1:m,1:m]
+                A12 = A[1:m,m+1:n]
+                B11 = A11 + A12[:,m:-1:1]
+                B22 = A11 - A12[:,m:-1:1]
                 tic()
-                Lp,Lm = StructCentro(A,tol)
+                L1 = UnStructCentro(B11,tol)
+                L2 = UnStructCentro(B22,tol)
                 struct_times[n_i,r_i,f_i] = toc()
+                G1 = [L1; L1[m:-1:1,:]]/sqrt(2)
+                G2 = [L2; -L2[m:-1:1,:]]/sqrt(2)
+                println("error: ",norm(A-G1*G1'-G2*G2'))
             end
         end
     end
@@ -52,7 +64,7 @@ function lapack_chol(A,tol)
     return L[:,1:rank]
 end
 
-function UnStructCentro(A,tol,block_size)
+function UnStructCentro(A,tol)
     Aout, piv, rank, info = LAPACK.pstrf!('L', A, tol)
     L = tril(Aout)
     L[piv,1:rank] = L[:,1:rank]
@@ -122,9 +134,9 @@ function StructCentro(A,tol)
     A11 = A[1:m,1:m]
     A12 = A[1:m,m+1:n]
     B11 = A11 + A12[:,m:-1:1]
-    L1 = UnStructCentro(A11,tol,192)
+    L1 = UnStructCentro(A11,tol)
     B22 = A11 - A12[:,m:-1:1]
-    L2 = UnStructCentro(A12,tol,192)
+    L2 = UnStructCentro(A12,tol)
     return L1,L2
 end
 
@@ -153,5 +165,5 @@ function TestRank()
     end
 end
 
-#SizeRankVersusSpeedup()
-TestRank()
+SizeRankVersusSpeedup()
+#TestRank()
