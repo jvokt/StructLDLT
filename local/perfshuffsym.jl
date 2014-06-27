@@ -15,31 +15,31 @@ function SizeRankVersusSpeedup()
         for r_i = 1:length(r_range)
             r1,r2 = r_range[r_i]
             println("n: ",n,", r1: ",r1,", r2: ",r2)
-            for t_i = 1:trials
                 A = RandPerfShuffSym(n,r1,r2)
                 L = deepcopy(A)
-                tic() # <- start
-                L,piv,rank,_ = LAPACK.pstrf!('L', L, tol)
-                unstruct_times[n_i,r_i,t_i] = toc() # <- stop
-                L[piv,:] = tril(L)
-                G = L[:,1:rank]
-                println("error: ",norm(A-G*G'))
-                # L = UnStructPerfShuff(Acopy,tol)
-                
                 Q = Qnn(n)
                 Qsym = Q[:,1:nsym]
                 Qskew = Q[:,nsym+1:nsym+nskew]
                 Lsym = full(sparse(Qsym)'*sparse(A)*sparse(Qsym))
                 Lskew = full(sparse(Qskew)'*sparse(A)*sparse(Qskew))
+            for t_i = 1:trials
+                tic() # <- start
+                L,piv,rank,_ = LAPACK.pstrf!('L', L, tol)
+                unstruct_times[n_i,r_i,t_i] = toc() # <- stop
+                #L[piv,:] = tril(L)
+                #G = L[:,1:rank]
+                #println("error: ",norm(A-G*G'))
+                # L = UnStructPerfShuff(Acopy,tol)
+                
                 tic() # <- start
                 Lsym,piv1,rank1,_ = LAPACK.pstrf!('L', Lsym, tol)
                 Lskew,piv2,rank2,_ = LAPACK.pstrf!('L', Lskew, tol)
                 struct_times[n_i,r_i,t_i] = toc() # <- stop
-                Lsym[piv1,:] = tril(Lsym)
-                Lskew[piv2,:] = tril(Lskew)
-                Gsym = full(sparse(Qsym)*sparse(Lsym[:,1:rank1]))
-                Gskew = full(sparse(Qskew)*sparse(Lskew[:,1:rank2]))
-                println("error: ",norm(A-Gsym*Gsym'-Gskew*Gskew'))
+                #Lsym[piv1,:] = tril(Lsym)
+                #Lskew[piv2,:] = tril(Lskew)
+                #Gsym = full(sparse(Qsym)*sparse(Lsym[:,1:rank1]))
+                #Gskew = full(sparse(Qskew)*sparse(Lskew[:,1:rank2]))
+                #println("error: ",norm(A-Gsym*Gsym'-Gskew*Gskew'))
                 # L1 = UnStructPerfShuff(Asym,tol)
                 # L2 = UnStructPerfShuff(Askew,tol)
             end
