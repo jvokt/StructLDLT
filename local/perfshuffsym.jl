@@ -1,41 +1,94 @@
 function SizeRankVersusSpeedup()
     # table of n = 500, 1000, 1500, 2000; r = n, n/2, n/10; f = 0, 1
-    # ratio of [L,D,P] = UnStructPerfShuff(A) divided by [Lp,Dp,Pp,Lm,Dm,Pm] = StructPerfShuff(A)
+    # ratio of L = UnStructPerfShuff(A) time divided by L1,L2 = StructPerfShuff(A) time
 
     tol = 1e-6
-
-    f = 0
-    n_range = [10, 20, 30, 40]
-    unstruct_times = zeros(length(n_range),3)
-    struct_times = zeros(length(n_range),3)
+    trials = 50
+    n_range = [20, 40, 60, 80, 100]
+    unstruct_times = zeros(length(n_range),5,trials)
+    struct_times = zeros(length(n_range),5,trials)
     for n_i = 1:length(n_range)
         n = n_range[n_i]
-        r_range = [n^2, n^2/2, n^2/10]
+        nsym = convert(Int64,n*(n+1)/2)
+        nskew = convert(Int64,n*(n-1)/2)
+        r_range = [(nsym,nskew), (nsym,n/2), (nsym,0), (n/2,n/2), (n,0)]
         for r_i = 1:length(r_range)
-            r = r_range[r_i]
-            println("n: ",n,", r: ",r)
-            A = RandPerfShuffSym(n,r,f)
-            tic()
-            L = UnStructPerfShuff(A,tol,192)
-            unstruct_times[n_i,r_i] = toc()
-            tic()
-            Lp,Lm = StructPerfShuff(A,tol)
-            struct_times[n_i,r_i] = toc()
+            r1,r2 = r_range[r_i]
+            println("n: ",n,", r1: ",r1,", r2: ",r2)
+            for t_i = 1:trials
+                A = RandPerfShuffSym(n,r1,r2)
+                L = deepcopy(A)
+                tic() # <- start
+                L,piv,rank,_ = LAPACK.pstrf!('L', L, tol)
+                unstruct_times[n_i,r_i,t_i] = toc() # <- stop
+                L[piv,:] = tril(L)
+                G = L[:,1:rank]
+                println("error: ",norm(A-G*G'))
+                # L = UnStructPerfShuff(Acopy,tol)
+                
+                Q = Qnn(n)
+                Qsym = Q[:,1:nsym]
+                Qskew = Q[:,nsym+1:nsym+nskew]
+                Lsym = full(sparse(Qsym)'*sparse(A)*sparse(Qsym))
+                Lskew = full(sparse(Qskew)'*sparse(A)*sparse(Qskew))
+                tic() # <- start
+                Lsym,piv1,rank1,_ = LAPACK.pstrf!('L', Lsym, tol)
+                Lskew,piv2,rank2,_ = LAPACK.pstrf!('L', Lskew, tol)
+                struct_times[n_i,r_i,t_i] = toc() # <- stop
+                Lsym[piv1,:] = tril(Lsym)
+                Lskew[piv2,:] = tril(Lskew)
+                Gsym = full(sparse(Qsym)*sparse(Lsym[:,1:rank1]))
+                Gskew = full(sparse(Qskew)*sparse(Lskew[:,1:rank2]))
+                println("error: ",norm(A-Gsym*Gsym'-Gskew*Gskew'))
+                # L1 = UnStructPerfShuff(Asym,tol)
+                # L2 = UnStructPerfShuff(Askew,tol)
+            end
         end
     end
-    display(unstruct_times./struct_times)
+    display(mean(unstruct_times,3)./mean(struct_times,3))
+    println()
+    display(mean(unstruct_times./struct_times,3))
 end
 
-function RandPerfShuffSym(n,r,f)
+function Qnn(n)
+    # Q is the n^2 by n^2 orthgonal matrix which 
+    # block diagonalizes symmetric perfect shuffle invariant matrices
+
+    Q = zeros(n^2,n^2)
+    e = eye(n,n)
+    k = 0
+    # Define Qsym
+    for i=1:n
+        for j=i:n
+            k = k+1
+            if i == j
+                Q[:,k] = kron(e[:,i],e[:,i])
+            else
+                Q[:,k] = (kron(e[:,i],e[:,j]) + kron(e[:,j],e[:,i]))/sqrt(2)
+            end
+        end
+    end
+    # Define Qskew
+    for i=1:n
+        for j=i+1:n
+            k = k+1
+            Q[:,k] = (kron(e[:,i],e[:,j]) - kron(e[:,j],e[:,i]))/sqrt(2)
+        end
+    end
+    return Q
+end
+
+function RandPerfShuffSym(n,r1,r2)
     # Returns a rank-r matrix with Perfect Shuffle Symmetry
     A = zeros(n^2,n^2)
-    for i=1:r
+    for i=1:r1
         B = randn(n,n)
-        if f == 1 && i > n*(n+1)/2
-            B -= B'
-        else
-            B += B'
-        end
+        B += B'
+        A += vec(B)*vec(B)'
+    end
+    for i=1:r2
+        B = randn(n,n)
+        B -= B'
         A += vec(B)*vec(B)'
     end
     return A
@@ -43,12 +96,10 @@ end
 
 function lapack_chol(A,tol)
     Aout, piv, rank, info = LAPACK.pstrf!('L', A, tol)
-    L = tril(Aout)
-    L[piv,1:rank] = L[:,1:rank]
-    return L[:,1:rank]
+    return Aout,piv,rank
 end
 
-function UnStructPerfShuff(A,tol,block_size)
+function UnStructPerfShuff(A,tol)
     Aout, piv, rank, info = LAPACK.pstrf!('L', A, tol)
     L = tril(Aout)
     L[piv,1:rank] = L[:,1:rank]
