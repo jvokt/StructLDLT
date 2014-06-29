@@ -1,47 +1,51 @@
 function SizeRankVersusSpeedup()
     # table of n = 500, 1000, 1500, 2000; r = n, n/2, n/10; f = 0, 1
     # ratio of L = UnStructPerfShuff(A) time divided by L1,L2 = StructPerfShuff(A) time
-
+    
     tol = 1e-6
     trials = 50
-    n_range = [20, 40, 60, 80]#, 100]
+    n_range = [20, 40, 60, 80, 100]
     unstruct_times = zeros(length(n_range),5,trials)
     struct_times = zeros(length(n_range),5,trials)
     for n_i = 1:length(n_range)
         n = n_range[n_i]
         nsym = convert(Int64,n*(n+1)/2)
         nskew = convert(Int64,n*(n-1)/2)
+        Q = sparse(Qnn(n))
+        Qsym = Q[:,1:nsym]
+        Qskew = Q[:,nsym+1:end]
         r_range = [(nsym,nskew), (nsym,n/2), (nsym,0), (n/2,n/2), (n,0)]
         for r_i = 1:length(r_range)
-            r1,r2 = r_range[r_i]
+            r1,r2 = convert((Int64,Int64),r_range[r_i])
+            r = r1+r2
             println("n: ",n,", r1: ",r1,", r2: ",r2)
-                A = RandPerfShuffSym(n,r1,r2)
-                L = deepcopy(A)
-                Q = Qnn(n)
-                Qsym = Q[:,1:nsym]
-                Qskew = Q[:,nsym+1:nsym+nskew]
-                Lsym = full(sparse(Qsym)'*sparse(A)*sparse(Qsym))
-                Lskew = full(sparse(Qskew)'*sparse(A)*sparse(Qskew))
+            B,C = RandPerfShuff(n,r1,r2)
+            # A = FullPerfShuff(B,C)
+            X = Qsym*B*Qsym'
+            Y = Qskew*C*Qskew'
+            A = X + Y
             for t_i = 1:trials
+                Atemp = deepcopy(A)
+                Btemp = deepcopy(B)
+                Ctemp = deepcopy(C)
+
                 tic() # <- start
-                L,piv,rank,_ = LAPACK.pstrf!('L', L, tol)
+                L,piv,rank,_ = UnStructPerfShuff(Atemp)
                 unstruct_times[n_i,r_i,t_i] = toc() # <- stop
-                #L[piv,:] = tril(L)
-                #G = L[:,1:rank]
-                #println("error: ",norm(A-G*G'))
-                # L = UnStructPerfShuff(Acopy,tol)
+                # L[piv,:] = tril(L)
+                # L = L[:,1:rank]
+                # println("error: ",norm(A-L*L'))
                 
                 tic() # <- start
-                Lsym,piv1,rank1,_ = LAPACK.pstrf!('L', Lsym, tol)
-                Lskew,piv2,rank2,_ = LAPACK.pstrf!('L', Lskew, tol)
+                Lsym,psym,rsym,Lskew,pskew,rskew = StructPerfShuff(Btemp,Ctemp)
                 struct_times[n_i,r_i,t_i] = toc() # <- stop
-                #Lsym[piv1,:] = tril(Lsym)
-                #Lskew[piv2,:] = tril(Lskew)
-                #Gsym = full(sparse(Qsym)*sparse(Lsym[:,1:rank1]))
-                #Gskew = full(sparse(Qskew)*sparse(Lskew[:,1:rank2]))
-                #println("error: ",norm(A-Gsym*Gsym'-Gskew*Gskew'))
-                # L1 = UnStructPerfShuff(Asym,tol)
-                # L2 = UnStructPerfShuff(Askew,tol)
+                # Lsym[psym,:] = tril(Lsym)
+                # Gsym = Lsym[:,1:rsym]
+                # Gsym = Qsym*Gsym
+                # Lskew[pskew,:] = tril(Lskew)
+                # Gskew = Lskew[:,1:rskew]
+                # Gskew = Qskew*Gskew
+                # println("error: ",norm(A-Gsym*Gsym'-Gskew*Gskew'))
             end
         end
     end
@@ -78,88 +82,107 @@ function Qnn(n)
     return Q
 end
 
-function RandPerfShuffSym(n,r1,r2)
-    # Returns a rank-r matrix with Perfect Shuffle Symmetry
-    A = zeros(n^2,n^2)
-    for i=1:r1
-        B = randn(n,n)
-        B += B'
-        A += vec(B)*vec(B)'
-    end
-    for i=1:r2
-        B = randn(n,n)
-        B -= B'
-        A += vec(B)*vec(B)'
-    end
-    return A
-end
+function Onn(n)
+    # O is the n^2 by n^2 zero-one matrix which 
+    # block diagonalizes symmetric perfect shuffle invariant matrices
 
-function lapack_chol(A,tol)
-    Aout, piv, rank, info = LAPACK.pstrf!('L', A, tol)
-    return Aout,piv,rank
-end
-
-function UnStructPerfShuff(A,tol)
-    Aout, piv, rank, info = LAPACK.pstrf!('L', A, tol)
-    L = tril(Aout)
-    L[piv,1:rank] = L[:,1:rank]
-    return L[:,1:rank]
-end
-
-function UnStructPerfShuff2(A,tol,block_size)
-    n = size(A,1)
-    num_blocks = convert(Int64,div(n,block_size)) + (convert(Bool,mod(n,block_size)) ? 1 : 0)
-    D = Array{Float64,2}[]
-    for i=1:num_blocks
-        range_i = (i-1)*block_size+1:min(i*block_size,n)
-        push!(D,A[range_i,range_i])
-    end
-    L = [Array{Float64,2}[] for i=1:num_blocks]
-    piv = [1:num_blocks]
-    error = sum(map(trace,D))
-    j = 1
-    while error > tol
-        idx = indmax(map(trace,D[piv[j:num_blocks]]))+j-1
-        piv[j],piv[idx] = piv[idx],piv[j]
-        lower_j = (piv[j]-1)*block_size+1
-        upper_j = min(piv[j]*block_size,n)
-        range_j = lower_j:upper_j
-        block_size_j = upper_j-lower_j+1
-        G = lapack_chol(D[piv[j]],tol)
-        r = size(G,2)
-        # L[piv[j]][j] = G
-        push!(L[piv[j]],G)
-        for i=j+1:num_blocks
-            lower_i = (piv[i]-1)*block_size+1
-            upper_i = min(piv[i]*block_size,n)
-            range_i = lower_i:upper_i
-            block_size_i = upper_i-lower_i+1
-            # GEMM update of subdiagonal blocks
-            S = A[range_i,range_j]
-            for k=1:j-1
-                S -= L[piv[i]][k]*L[piv[j]][k]'
+    O = zeros(n^2,n^2)
+    e = eye(n,n)
+    k = 0
+    # Define Osym
+    for i=1:n
+        for j=i:n
+            k = k+1
+            if i == j
+                O[:,k] = kron(e[:,i],e[:,i])
+            else
+                O[:,k] = (kron(e[:,i],e[:,j]) + kron(e[:,j],e[:,i]))
             end
-            G = S/L[piv[j]][j]'
-            # SYRK update of diagonal blocks
-            D[piv[i]] -= G*G'
-            # L[piv[i]][j] = G
-            push!(L[piv[i]],G)
-        end
-        error = sum(map(trace,D[piv[j+1:num_blocks]]))
-        j+=1
-    end
-    L2 = zeros(n,min(block_size*(j-1),n))
-    for jj=1:j-1
-        lower_j = (jj-1)*block_size+1
-        for ii=jj:num_blocks
-            lower_i = (piv[ii]-1)*block_size+1
-            block_size_i,block_size_j = size(L[piv[ii]][jj])
-            range_i = lower_i:min(lower_i+block_size_i-1,n)
-            range_j = lower_j:min(lower_j+block_size_j-1,n)
-            L2[range_i,range_j] = L[piv[ii]][jj]
         end
     end
-    return L2
+    # Define Oskew
+    for i=1:n
+        for j=i+1:n
+            k = k+1
+            O[:,k] = (kron(e[:,i],e[:,j]) - kron(e[:,j],e[:,i]))
+        end
+    end
+    return O
+end
+
+function tnn(n)
+    unity = [j+(j-1)*n-(j-1)j/2 for j=1:n]
+    t = ones(n^2)/sqrt(2)
+    t[unity] = 1
+    return t
+end
+
+function SymUnpackRows(B,n)
+    # [unpackIndex(c,n) for c=1:n*(n+1)/2]
+    G = zeros(n^2,size(B,2))
+    for c=1:n*(n+1)/2
+        i, j = unpackIndex(c,n)
+        if i > j
+            r1 = i+(j-1)*n
+            G[r1,:] = B[c,:]/sqrt(2)
+            r2 = j+(i-1)*n
+            G[r2,:] = B[c,:]/sqrt(2)
+        else
+            r1 = i+(j-1)*n
+            G[r1,:] = B[c,:]
+        end            
+    end
+    return G
+end
+
+function CompareSymUnpackRowsQsym()
+    for n=10:10:100
+        nsym = convert(Int64,n*(n+1)/2)
+        B = randn(nsym,n)
+        Q = sparse(Qnn(n))
+        Qsym = Q[:,1:nsym]
+        
+        tic()
+        G1 = Qsym*B
+        toc()
+
+        tic()
+        G2 = SymUnpackRows(B,n)
+        toc()
+        
+        println("Error: ",norm(G1-G2))
+    end
+end
+
+function RandPerfShuff(n,r1,r2)
+    # Returns a rank-r matrix with Perfect Shuffle Symmetry
+    nsym = convert(Int64,n*(n+1)/2)
+    nskew = convert(Int64,n*(n-1)/2)
+    B = randn(nsym,r1)
+    B = B*B'
+    C = randn(nskew,r2)
+    C = C*C'
+    return B,C
+end
+
+function lapack_chol(A,tol=1e-6)
+    A, piv, rank, info = LAPACK.pstrf!('L', A, tol)
+    A[piv,:] = tril(A)
+    return A[:,1:rank]
+end
+
+function FullPerfShuff(B,C)
+    Q = sparse(Qnn(n))
+    Qsym = Q[:,1:nsym]
+    Qskew = Q[:,nsym+1:end]
+    X = Qsym*B*Qsym'
+    Y = Qskew*C*Qskew'
+    return X + Y
+end
+
+function UnStructPerfShuff(A,tol=1e-6)
+    # Computes the rank-revealing Cholesky factorization of A, without utilizing Perfect Shuffle Symmetry Structure
+    return LAPACK.pstrf!('L', A, tol)
 end
 
 function unpackIndex(c,n)
@@ -211,18 +234,11 @@ function struct_block(A,lower_i,lower_j,block_size_i,block_size_j)
     return block
 end
 
-function StructPerfShuff(A,tol)
-    # Computes the rank-revealing Cholesky factorization of A, utilizing PerfShuffsymmetric structure
-    n2 = size(A,1)
-    n = convert(Int64,sqrt(n2))
-    nsym = convert(Int64,n*(n+1)/2)
-#    B11 = struct_block(A,1,1,nsym,nsym)
-    B11 = A[1:nsym,1:nsym]
-    L1 = UnStructPerfShuff(B11,tol,192)
-#    B22 = struct_block(A,1,1,nsym,nsym)
-    B22 = A[nsym+1:n2,nsym+1:n2]
-    L2 = UnStructPerfShuff(B22,tol,192)
-    return L1,L2
+function StructPerfShuff(B,C,tol=1e-6)
+    # Computes the rank-revealing Cholesky factorization of A, utilizing PerfShuffSymmetric structure
+    Asym,psym,rsym,_ = LAPACK.pstrf!('L', B, tol)
+    Askew,pskew,rskew,_ = LAPACK.pstrf!('L', C, tol)
+    return Asym,psym,rsym,Askew,pskew,rskew
 end
 
 function PerfShuff(p,r)
@@ -276,3 +292,4 @@ end
 
 SizeRankVersusSpeedup()
 #TestRank()
+#CompareSymUnpackRowsQsym()
