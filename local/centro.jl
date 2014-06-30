@@ -1,6 +1,8 @@
 function SizeRankVersusSpeedup()
-    # table of n = 500, 1000, 1500, 2000; r = n, n/2, n/10; f = 0, 1
-    # ratio of L = UnStructCentro(A) time divided by L1,L2 = StructCentro(A) time
+    # produce a table of n = 500, 1000, 1500, 2000
+    # versus (r1,r2) = (m,m), (m,n/10), (m,0), (n/100,n/100), (n/100,0)
+    # ratio of L,piv,rank = UnStructCentro(A) time divided
+    # by Lsym,psym,rsym,Lskew,pskew,rskew = StructCentro(A) time
 
     tol = 1e-6
     trials = 50
@@ -18,33 +20,48 @@ function SizeRankVersusSpeedup()
             B,C = RandCentro(n,r1,r2)
             A = FullCentro(B,C)
             for t_i = 1:trials
-                Atemp = deepcopy(A)
-                Btemp = deepcopy(B)
-                Ctemp = deepcopy(C)
-
+                Atemp = deepcopy(A)                
                 tic() # <- start
                 L,piv,rank,_ = UnStructCentro(Atemp)
                 unstruct_times[n_i,r_i,t_i] = toc() # <- stop
-                # L[piv,:] = tril(L)
-                # L = L[:,1:rank]
-                # println("error: ",norm(A-L*L'))
-                
                 tic() # <- start
-                Lsym,psym,rsym,Lskew,pskew,rskew = StructCentro(Btemp,Ctemp)
+                Lsym,psym,rsym,Lskew,pskew,rskew = StructCentro2(A)
                 struct_times[n_i,r_i,t_i] = toc() # <- stop
-                # Lsym[psym,:] = tril(Lsym)
-                # Gsym = Lsym[:,1:rsym]
-                # Gsym = [Gsym; Gsym[end:-1:1,:]]/sqrt(2)
-                # Lskew[pskew,:] = tril(Lskew)
-                # Gskew = Lskew[:,1:rskew]
-                # Gskew = [Gskew; -Gskew[end:-1:1,:]]/sqrt(2)
-                # println("error: ",norm(A-Gsym*Gsym'-Gskew*Gskew'))
             end
         end
     end
     display(mean(unstruct_times,3)./mean(struct_times,3))
     println()
     display(mean(unstruct_times./struct_times,3))
+end
+
+function UnStructCheck(L,piv,rank)
+    L[piv,:] = tril(L)
+    L = L[:,1:rank]
+    println("error: ",norm(A-L*L'))
+end
+
+function StructCheck(Lsym,psym,rsym,Lskew,pskew,rskew)
+    Lsym[psym,:] = tril(Lsym)
+    Gsym = Lsym[:,1:rsym]
+    Gsym = [Gsym; Gsym[end:-1:1,:]]/sqrt(2)
+    Lskew[pskew,:] = tril(Lskew)
+    Gskew = Lskew[:,1:rskew]
+    Gskew = [Gskew; -Gskew[end:-1:1,:]]/sqrt(2)
+    println("error: ",norm(A-Gsym*Gsym'-Gskew*Gskew'))    
+end
+
+function QE(m)
+    I = speye(m)/sqrt(2)
+    
+    Qsym = spzeros(2*m,m)
+    Qsym[1:m,1:m] = I
+    Qsym[m+1:end,1:m] = I[m:-1:1,:]
+    
+    Qskew = spzeros(2*m,m)
+    Qskew[1:m,1:m] = I
+    Qskew[m+1:end,1:m] = -I[m:-1:1,:]
+    return Qsym,Qskew
 end
 
 function CentroTrial1(n,m,r1,r2)
@@ -109,7 +126,92 @@ function UnStructCentro2(A,B,C,tol=1e-6)
     return G
 end
 
-function StructCentro(B,C,tol=1e-6)
+
+function CompareStructCentro()
+    n_range = [500 1000 1500 2000]
+    unstruct_times = zeros(length(n_range),5)
+    struct_times1 = zeros(length(n_range),5)
+    struct_times2 = zeros(length(n_range),5)
+    struct_times3 = zeros(length(n_range),5)
+    struct_times4 = zeros(length(n_range),5)
+    for n_i = 1:length(n_range)
+        n = n_range[n_i]
+        m = int(n/2)
+        Qsym,Qskew = QE(m)
+        r_range = [(m,m), (m,n/10), (m,0), (n/100,n/100), (n/100,0)]
+        for r_i = 1:length(r_range)
+            r1,r2 = convert((Int64,Int64),r_range[r_i])
+            r = r1+r2
+            println("n: ",n,", r1: ",r1,", r2: ",r2)
+            B,C = RandCentro(n,r1,r2)
+            A = FullCentro(B,C)
+            Atemp = deepcopy(A)
+            
+            tic()
+            UnStructCentro(Atemp)
+            unstruct_times[n_i,r_i] = toc()
+            
+            tic()
+            StructCentro1(A,Qsym,Qskew)
+            struct_times1[n_i,r_i] = toc()
+
+            tic()
+            StructCentro2(A)
+            struct_times2[n_i,r_i] = toc()
+            
+            X = A[1:end/2,1:end/2]
+            Y = A[1:end/2,end:-1:end/2+1]
+            tic()
+            StructCentro3(X,Y)
+            struct_times3[n_i,r_i] = toc()
+            
+            tic()
+            StructCentro4(B,C)
+            struct_times4[n_i,r_i] = toc()
+        end
+    end
+    display(unstruct_times./struct_times1)
+    println()
+    display(unstruct_times./struct_times2)
+    println()
+    display(unstruct_times./struct_times3)
+    println()
+    display(unstruct_times./struct_times4)
+    println()
+end
+
+function StructCentro1(A,Qsym,Qskew,tol=1e-6)
+    # Computes the rank-revealing Cholesky factorization of A, utilizing Centrosymmetric structure
+    B = Qsym'*A*Qsym
+    Asym,psym,rsym,_ = LAPACK.pstrf!('L', B, tol)
+    C = Qskew'*A*Qskew
+    Askew,pskew,rskew,_ = LAPACK.pstrf!('L', C, tol)
+    return Asym,psym,rsym,Askew,pskew,rskew
+end
+
+function StructCentro2(A,tol=1e-6)
+    # Computes the rank-revealing Cholesky factorization of A, utilizing Centrosymmetric structure
+    X = A[1:end/2,1:end/2]
+    Y = A[1:end/2,end:-1:end/2+1]
+    B = X + Y
+    C = X - Y
+    Asym,psym,rsym,_ = LAPACK.pstrf!('L', B, tol)
+    Askew,pskew,rskew,_ = LAPACK.pstrf!('L', C, tol)
+    return Asym,psym,rsym,Askew,pskew,rskew
+end
+
+function StructCentro3(X,Y,tol=1e-6)
+    # Computes the rank-revealing Cholesky factorization of A, utilizing Centrosymmetric structure
+#    X = A[1:end/2,1:end/2]
+#    Y = A[1:end/2,end:-1:end/2+1]
+    B = X + Y
+    Asym,psym,rsym,_ = LAPACK.pstrf!('L', B, tol)
+    C = X - Y
+    Askew,pskew,rskew,_ = LAPACK.pstrf!('L', C, tol)
+    return Asym,psym,rsym,Askew,pskew,rskew
+end
+
+function StructCentro4(B,C,tol=1e-6)
     # Computes the rank-revealing Cholesky factorization of A, utilizing Centrosymmetric structure
     Asym,psym,rsym,_ = LAPACK.pstrf!('L', B, tol)
     Askew,pskew,rskew,_ = LAPACK.pstrf!('L', C, tol)
@@ -141,5 +243,42 @@ function TestRank()
     end
 end
 
+function EstimateConstant()
+    n_range = [500, 1000, 1500, 2000, 3000]
+    times = zeros(length(n_range))
+    for n_i = 1:length(n_range)
+        n = n_range[n_i]
+        A = randn(n,n); A = A*A'
+        tic()
+        LAPACK.pstrf!('L',A,1e-6)
+        times[n_i] = toc()
+    end
+    figure()
+    plot(n_range,times)
+    figure()
+    plot(log(n_range),log(times))
+    c = [log(n_range) ones(length(n_range))]\log(times)
+end
+
+function PredictedSpeedup()
+    c = 1/2 # EstimateConstant()
+    n_range = [500, 1000, 1500, 2000]
+    speedup = zeros(length(n_range),5)
+    for n_i = 1:length(n_range)
+        n = n_range[n_i]
+        m = convert(Int64,n/2)
+        r_range = [(m,m), (m,n/10), (m,0), (n/100,n/100), (n/100,0)]
+        for r_i = 1:length(r_range)
+            r1,r2 = convert((Int64,Int64),r_range[r_i])
+            r = r1+r2
+            println("n: ",n,", r1: ",r1,", r2: ",r2)
+            speedup[n_i,r_i] = 2r^2/(8n+r1^2+r2^2)
+        end
+    end
+    display(speedup)
+end
+
 SizeRankVersusSpeedup()
 #TestRank()
+#CompareStructCentro()
+#PredictedSpeedup()
