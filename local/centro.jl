@@ -6,7 +6,7 @@ function SizeRankVersusSpeedup()
 
     tol = 1e-6
     trials = 50
-    n_range = [500, 1000, 1500, 2000]
+    n_range = [1500, 3000, 4500, 6000]
     unstruct_times = zeros(length(n_range),5,trials)
     struct_times = zeros(length(n_range),5,trials)
     for n_i = 1:length(n_range)
@@ -262,7 +262,8 @@ end
 
 function PredictedSpeedup()
     c = 1/2 # EstimateConstant()
-    n_range = [500, 1000, 1500, 2000]
+#    n_range = [500, 1000, 1500, 2000]
+    n_range = [1500, 3000, 4500, 6000]
     speedup = zeros(length(n_range),5)
     for n_i = 1:length(n_range)
         n = n_range[n_i]
@@ -272,13 +273,14 @@ function PredictedSpeedup()
             r1,r2 = convert((Int64,Int64),r_range[r_i])
             r = r1+r2
             println("n: ",n,", r1: ",r1,", r2: ",r2)
-            speedup[n_i,r_i] = 2r^2/(8n+r1^2+r2^2)
+            speedup[n_i,r_i] = 2r^2/(2n+r1^2+r2^2)
         end
     end
     display(speedup)
+    println()
 end
 
 SizeRankVersusSpeedup()
 #TestRank()
 #CompareStructCentro()
-#PredictedSpeedup()
+PredictedSpeedup()

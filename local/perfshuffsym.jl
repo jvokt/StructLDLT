@@ -22,11 +22,11 @@ function SizeRankVersusSpeedup()
             for t_i = 1:trials
                 Atemp = deepcopy(A)
                 tic() # <- start
-                L,piv,rank,_ = UnStructPerfShuff(Atemp)
+                UnStructPerfShuff(Atemp)
                 unstruct_times[n_i,r_i,t_i] = toc() # <- stop
                 # UnStructCheck(A,L,piv,rank)
                 tic() # <- start
-                Lsym,psym,rsym,Lskew,pskew,rskew = StructPerfShuff2(A)
+                StructPerfShuff2(A)
                 struct_times[n_i,r_i,t_i] = toc() # <- stop
                 # StructCheck(A,Lsym,psym,rsym,Lskew,pskew,rskew)
             end
@@ -44,20 +44,26 @@ function UnStructCheck(A,L,piv,rank)
 end
 
 function StructCheck(A,Lsym,psym,rsym,Lskew,pskew,rskew)
+    # n = 3;r1 = 6; r2 = 3
+    # A = RandPerfShuff(n,r1,r2);
+    # Lsym,psym,rsym,Lskew,pskew,rskew = StructPerfShuff3(A);
+    # StructCheck(A,Lsym,psym,rsym,Lskew,pskew,rskew)
     n2 = size(A,1)
     n = int(sqrt(n2))
     nsym = int(n*(n+1)/2)
     nskew = int(n*(n-1)/2)
+    s = snn(n)
     Q = sparse(Qnn(n))
     Qsym = Q[:,1:nsym]
     Qskew = Q[:,nsym+1:end]
     Lsym[psym,:] = tril(Lsym)
-    Gsym = Lsym[:,1:rsym]
-    Gsym = Qsym*Gsym
+    #Gsym = scale(s,Lsym[:,1:rsym])
+    #Gsym = Qsym*Gsym
+    Gsym = SymUnpackRows2(Lsym[:,1:rsym],n)
     Lskew[pskew,:] = tril(Lskew)
     Gskew = Lskew[:,1:rskew]
     Gskew = Qskew*Gskew
-    println("error: ",norm(A-Gsym*Gsym'-Gskew*Gskew'))    
+    println("error: ",norm(A-(1/2)*Gsym*Gsym'-Gskew*Gskew'))    
 end
 
 function Qnn(n)
@@ -130,21 +136,30 @@ function snn(n)
     return t
 end
 
-function SymUnpackRows(B,n)
+function SymUnpackRows1(B,n)
     # [unpackIndex(c,n) for c=1:n*(n+1)/2]
     G = zeros(n^2,size(B,2))
     for c=1:n*(n+1)/2
         i, j = unpackIndex(c,n)
         if i > j
             r1 = i+(j-1)*n
-            G[r1,:] = B[c,:]/sqrt(2)
+            G[r1,:] = B[c,:]
             r2 = j+(i-1)*n
-            G[r2,:] = B[c,:]/sqrt(2)
+            G[r2,:] = B[c,:]
         else
             r1 = i+(j-1)*n
             G[r1,:] = B[c,:]
         end            
     end
+    return G
+end
+
+function SymUnpackRows2(B,n)
+    G = zeros(n^2,size(B,2))
+    sym_indices = SymIndices(n)
+    PS = PerfShuff(n,n)
+    G[sym_indices,:] = B
+    G[PS[sym_indices],:] = B
     return G
 end
 
@@ -213,22 +228,31 @@ function SkewUnpackRows(B,n)
     return G
 end
 
-function CompareSymUnpackRowsQsym()
-    for n=10:10:100
+function CompareSymUnpackRows()
+    n_range = [20, 40, 60, 80, 100]
+    for n_i = 1:length(n_range)
+        n = n_range[n_i]
         nsym = convert(Int64,n*(n+1)/2)
-        B = randn(nsym,n)
+        B = randn(nsym,6n)
         Q = sparse(Qnn(n))
         Qsym = Q[:,1:nsym]
+        O = sparse(Onn(n))
+        Osym = O[:,1:nsym]
         
         tic()
-        G1 = Qsym*B
-        toc()
-
-        tic()
-        G2 = SymUnpackRows(B,n)
+        G = Osym*B
         toc()
         
-        println("Error: ",norm(G1-G2))
+        tic()
+        G1 = SymUnpackRows1(B,n)
+        toc()
+        
+        tic()
+        G2 = SymUnpackRows2(B,n)
+        toc()
+        
+        println("Error: ",norm(G-G1))
+        println("Error: ",norm(G-G2))
     end
 end
 
@@ -418,8 +442,51 @@ function StructPerfShuff2(A,tol=1e-6)
     # Computes the rank-revealing Cholesky factorization of A, utilizing PerfShuffSymmetric structure
     n2 = size(A,1)
     n = int(sqrt(n2))
+#    tic()
     B = sym_block(A,n)
+#    toc()
+#    tic()
     C = skew_block(A,n)
+#    toc()
+#    tic()
+    Asym,psym,rsym,_ = LAPACK.pstrf!('L', B, tol)
+#    toc()
+#    tic()
+    Askew,pskew,rskew,_ = LAPACK.pstrf!('L', C, tol)
+#    toc()
+    return Asym,psym,rsym,Askew,pskew,rskew
+end
+
+function StructPerfShuff3(A,tol=1e-6)
+    # Computes the rank-revealing Cholesky factorization of A, utilizing PerfShuffSymmetric structure
+    n2 = size(A,1)
+    n = int(sqrt(n2))
+    PS = PerfShuff(n,n)
+    nsym = int(n*(n+1)/2)
+    nskew = int(n*(n-1)/2)
+    sym_indices = zeros(Int64,nsym)
+    skew_indices = zeros(Int64,nskew)
+    sym_idx = 1
+    skew_idx = 1
+    for j=1:n
+        j_base = (j-1)*n
+        sym_indices[sym_idx] = j+j_base
+        sym_idx += 1
+        for i=j+1:n
+            sym_indices[sym_idx] = i+j_base
+            sym_idx += 1
+            skew_indices[skew_idx] = i+j_base
+            skew_idx += 1
+        end
+    end
+    X = A[sym_indices,sym_indices]
+    Y = A[sym_indices,PS[sym_indices]]
+    # s = snn(n)
+    # B = scale(s,scale(X + Y,s))
+    B = X + Y
+    X = A[skew_indices,skew_indices]
+    Y = A[skew_indices,PS[skew_indices]]
+    C = X - Y
     Asym,psym,rsym,_ = LAPACK.pstrf!('L', B, tol)
     Askew,pskew,rskew,_ = LAPACK.pstrf!('L', C, tol)
     return Asym,psym,rsym,Askew,pskew,rskew
@@ -456,7 +523,7 @@ function sym_block_precompute(A)
     return A[sym_indices,sym_indices]
 end
 
-function StructPerfShuff3(B,C,tol=1e-6)
+function StructPerfShuff4(B,C,tol=1e-6)
     # Computes the rank-revealing Cholesky factorization of A, utilizing PerfShuffSymmetric structure
     Asym,psym,rsym,_ = LAPACK.pstrf!('L', B, tol)
     Askew,pskew,rskew,_ = LAPACK.pstrf!('L', C, tol)
@@ -517,7 +584,7 @@ function CompareStructPerfShuff()
     unstruct_times = zeros(length(n_range),5)
     struct_times1 = zeros(length(n_range),5)
     struct_times2 = zeros(length(n_range),5)
-#    struct_times3 = zeros(length(n_range),5)
+    struct_times3 = zeros(length(n_range),5)
 #    struct_times4 = zeros(length(n_range),5)
     for n_i = 1:length(n_range)
         n = n_range[n_i]
@@ -545,9 +612,9 @@ function CompareStructPerfShuff()
             
             #X = A[1:end/2,1:end/2]
             #Y = A[1:end/2,end:-1:end/2+1]
-            #tic()
-            #StructPerfShuff3(X,Y)
-            #struct_times3[n_i,r_i] = toc()
+            tic()
+            StructPerfShuff3(A)
+            struct_times3[n_i,r_i] = toc()
             
             #tic()
             #StructPerfShuff4(B,C)
@@ -557,17 +624,36 @@ function CompareStructPerfShuff()
     display(unstruct_times./struct_times1)
     println()
     display(unstruct_times./struct_times2)
-    #println()
-    #display(unstruct_times./struct_times3)
-    #println()
+    println()
+    display(unstruct_times./struct_times3)
+    println()
     #display(unstruct_times./struct_times4)
     #println()
 end
 
+function PredictedSpeedup()
+    n_range = [20, 40, 60, 80, 100]
+    speedup = zeros(length(n_range),5)
+    for n_i = 1:length(n_range)
+        n = n_range[n_i]
+        nsym = convert(Int64,n*(n+1)/2)
+        nskew = convert(Int64,n*(n-1)/2)
+        r_range = [(nsym,nskew), (nsym,n/2), (nsym,0), (n/2,n/2), (n,0)]
+        for r_i = 1:length(r_range)
+            r1,r2 = convert((Int64,Int64),r_range[r_i])
+            r = r1+r2
+            println("n: ",n,", r1: ",r1,", r2: ",r2)
+            speedup[n_i,r_i] = 2n*r^2/(n*(n+1)^2+n*(n-1)^2+(n+1)r1^2+(n-1)r2^2)
+        end
+    end
+    display(speedup)
+    println()
+end
 
 SizeRankVersusSpeedup()
 #TestRank()
-#CompareSymUnpackRowsQsym()
+#CompareSymUnpackRows()
 #CompareRand()
 #CompareSymBlock()
 #CompareStructPerfShuff()
+#PredictedSpeedup()
