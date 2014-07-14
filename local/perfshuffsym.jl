@@ -5,7 +5,7 @@ function SizeRankVersusSpeedup()
     # by Lsym,psym,rsym,Lskew,pskew,rskew = StructPerfShuff(A) time
     
     tol = 1e-6
-    trials = 50
+    trials = 5#0
     n_range = [20, 40, 60, 80]#, 100]
     unstruct_times = zeros(length(n_range),5,trials)
     struct_times = zeros(length(n_range),5,trials)
@@ -13,7 +13,7 @@ function SizeRankVersusSpeedup()
         n = n_range[n_i]
         nsym = convert(Int64,n*(n+1)/2)
         nskew = convert(Int64,n*(n-1)/2)
-        r_range = [(nsym,nskew), (nsym,n/2), (nsym,0), (n/2,n/2), (n,0)]
+        r_range = [(nsym,nskew), (nsym,6n), (nsym,0), (6n,6n), (6n,0)]
         for r_i = 1:length(r_range)
             r1,r2 = convert((Int64,Int64),r_range[r_i])
             r = r1+r2
@@ -53,9 +53,7 @@ function StructCheck(A,Lsym,psym,rsym,Lskew,pskew,rskew)
     nsym = int(n*(n+1)/2)
     nskew = int(n*(n-1)/2)
     s = snn(n)
-    Q = sparse(Qnn(n))
-    Qsym = Q[:,1:nsym]
-    Qskew = Q[:,nsym+1:end]
+    Qsym,Qskew = Qnn(n)
     Lsym[psym,:] = tril(Lsym)
     #Gsym = scale(s,Lsym[:,1:rsym])
     #Gsym = Qsym*Gsym
@@ -70,56 +68,63 @@ function Qnn(n)
     # Q is the n^2 by n^2 orthgonal matrix which 
     # block diagonalizes symmetric perfect shuffle invariant matrices
 
-    Q = zeros(n^2,n^2)
-    e = eye(n,n)
-    k = 0
     # Define Qsym
+    Qsym = spzeros(n^2,int(n*(n+1)/2))
+    e = eye(n,n)
+    k = 1
     for i=1:n
         for j=i:n
-            k = k+1
             if i == j
-                Q[:,k] = kron(e[:,i],e[:,i])
+                Qsym[i+(i-1)*n,k] = 1
             else
-                Q[:,k] = (kron(e[:,i],e[:,j]) + kron(e[:,j],e[:,i]))/sqrt(2)
+                Qsym[i+(j-1)*n,k] = 1/sqrt(2)
+                Qsym[j+(i-1)*n,k] = 1/sqrt(2)
             end
+            k = k+1
         end
     end
     # Define Qskew
+    Qskew = spzeros(n^2,int(n*(n-1)/2))
+    k = 1
     for i=1:n
         for j=i+1:n
+            Qskew[j+(i-1)*n,k] = 1/sqrt(2)
+            Qskew[i+(j-1)*n,k] = -1/sqrt(2)
             k = k+1
-            Q[:,k] = (kron(e[:,i],e[:,j]) - kron(e[:,j],e[:,i]))/sqrt(2)
         end
     end
-    return Q
+    return Qsym,Qskew
 end
 
 function Onn(n)
     # O is the n^2 by n^2 zero-one matrix which 
     # block diagonalizes symmetric perfect shuffle invariant matrices
 
-    O = zeros(n^2,n^2)
-    e = eye(n,n)
-    k = 0
     # Define Osym
+    Osym = spzeros(n^2,int(n*(n+1)/2))
+    e = eye(n,n)
+    k = 1
     for i=1:n
         for j=i:n
-            k = k+1
             if i == j
-                O[:,k] = kron(e[:,i],e[:,i])
+                Osym[i+(i-1)*n,k] = 1
             else
-                O[:,k] = (kron(e[:,i],e[:,j]) + kron(e[:,j],e[:,i]))
+                Osym[i+(j-1)*n,k] = 1
+                Osym[j+(i-1)*n,k] = 1
             end
+            k = k+1
         end
     end
     # Define Oskew
+    Oskew = spzeros(n^2,int(n*(n-1)/2))
+    k = 1
     for i=1:n
         for j=i+1:n
+            Oskew[j+(i-1)*n,k] = 1
+            Oskew[i+(j-1)*n,k] = -1
             k = k+1
-            O[:,k] = (kron(e[:,i],e[:,j]) - kron(e[:,j],e[:,i]))
         end
     end
-    return O
 end
 
 function tnn(n)
@@ -234,10 +239,8 @@ function CompareSymUnpackRows()
         n = n_range[n_i]
         nsym = convert(Int64,n*(n+1)/2)
         B = randn(nsym,6n)
-        Q = sparse(Qnn(n))
-        Qsym = Q[:,1:nsym]
-        O = sparse(Onn(n))
-        Osym = O[:,1:nsym]
+        Qsym,Qskew = Qnn(n)
+        Osym,Oskew = Onn(n)
         
         tic()
         G = Osym*B
@@ -262,8 +265,7 @@ function CompareSymBlock()
         n = n_range[n_i]
         nsym = convert(Int64,n*(n+1)/2)
         nskew = convert(Int64,n*(n-1)/2)
-        Q = sparse(Qnn(n))
-        Qsym = Q[:,1:nsym]
+        Qsym,Qskew = Qnn(n)
         r_range = [(nsym,nskew), (nsym,n/2), (nsym,0), (n/2,n/2), (n,0)]
         for r_i = 1:length(r_range)
             r1,r2 = convert((Int64,Int64),r_range[r_i])
@@ -316,9 +318,7 @@ function RandPerfShuff1(n,r1,r2)
     B = B*B'
     C = randn(nskew,r2)
     C = C*C'
-    Q = sparse(Qnn(n))
-    Qsym = Q[:,1:nsym]
-    Qskew = Q[:,nsym+1:end]
+    Qsym,Qskew = Qnn(n)
     X = Qsym*B*Qsym'
     Y = Qskew*C*Qskew'
     return X + Y
@@ -328,9 +328,7 @@ function RandPerfShuff(n,r1,r2)
     # Returns a rank-r matrix with Perfect Shuffle Symmetry
     nsym = convert(Int64,n*(n+1)/2)
     nskew = convert(Int64,n*(n-1)/2)
-    Q = sparse(Qnn(n))
-    Qsym = Q[:,1:nsym]
-    Qskew = Q[:,nsym+1:end]
+    Qsym,Qskew = Qnn(n)
     B = Qsym*randn(nsym,r1)
     X = B*B'
     C = Qskew*randn(nskew,r2)
@@ -346,9 +344,7 @@ function RandPerfShuff3(n,r1,r2)
     X = B*B'
     C = SkewUnpackRows(randn(nskew,r2),n)
     Y = C*C'
-#    Q = sparse(Qnn(n))
-#    Qsym = Q[:,1:nsym]
-#    Qskew = Q[:,nsym+1:end]
+#    Qsym,Qskew = Qnn(n)
 #    X = Qsym*B*Qsym'
 #    Y = Qskew*C*Qskew'
     return X + Y
@@ -361,9 +357,7 @@ function lapack_chol(A,tol=1e-6)
 end
 
 function FullPerfShuff(B,C)
-    Q = sparse(Qnn(n))
-    Qsym = Q[:,1:nsym]
-    Qskew = Q[:,nsym+1:end]
+    Qsym,Qskew = Qnn(n)
     X = Qsym*B*Qsym'
     Y = Qskew*C*Qskew'
     return X + Y
@@ -428,9 +422,7 @@ function StructPerfShuff1(A,tol=1e-6)
     n2 = size(A,1)
     n = int(sqrt(n2))
     nsym = int(n*(n+1)/2)
-    Q = sparse(Qnn(n))
-    Qsym = Q[:,1:nsym]
-    Qskew = Q[:,nsym+1:end]
+    Qsym,Qskew = Qnn(n)
     B = Qsym'*A*Qsym
     C = Qskew'*A*Qskew
     Asym,psym,rsym,_ = LAPACK.pstrf!('L', B, tol)
@@ -632,13 +624,13 @@ function CompareStructPerfShuff()
 end
 
 function PredictedSpeedup()
-    n_range = [20, 40, 60, 80, 100]
+    n_range = [20, 40, 60, 80]#, 100]
     speedup = zeros(length(n_range),5)
     for n_i = 1:length(n_range)
         n = n_range[n_i]
         nsym = convert(Int64,n*(n+1)/2)
         nskew = convert(Int64,n*(n-1)/2)
-        r_range = [(nsym,nskew), (nsym,n/2), (nsym,0), (n/2,n/2), (n,0)]
+        r_range = [(nsym,nskew), (nsym,6n), (nsym,0), (6n,6n), (6n,0)]
         for r_i = 1:length(r_range)
             r1,r2 = convert((Int64,Int64),r_range[r_i])
             r = r1+r2
@@ -650,7 +642,7 @@ function PredictedSpeedup()
     println()
 end
 
-SizeRankVersusSpeedup()
+#SizeRankVersusSpeedup()
 #TestRank()
 #CompareSymUnpackRows()
 #CompareRand()

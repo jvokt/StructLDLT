@@ -5,14 +5,15 @@ function SizeRankVersusSpeedup()
     # by Lsym,psym,rsym,Lskew,pskew,rskew = StructCentro(A) time
 
     tol = 1e-6
-    trials = 50
+    trials = 5#0
     n_range = [1500, 3000, 4500, 6000]
-    unstruct_times = zeros(length(n_range),5,trials)
-    struct_times = zeros(length(n_range),5,trials)
+    unstruct_times = zeros(length(n_range),2,trials)
+    setup_times = zeros(length(n_range),2,trials)
+    fact_times = zeros(length(n_range),2,trials)
     for n_i = 1:length(n_range)
         n = n_range[n_i]
         m = convert(Int64,n/2)
-        r_range = [(m,m), (m,n/10), (m,0), (n/100,n/100), (n/100,0)]
+        r_range = [(m,m), (n/100,n/100)]
         for r_i = 1:length(r_range)
             r1,r2 = convert((Int64,Int64),r_range[r_i])
             r = r1+r2
@@ -20,19 +21,76 @@ function SizeRankVersusSpeedup()
             B,C = RandCentro(n,r1,r2)
             A = FullCentro(B,C)
             for t_i = 1:trials
-                Atemp = deepcopy(A)                
+                Atemp = deepcopy(A)
                 tic() # <- start
                 L,piv,rank,_ = UnStructCentro(Atemp)
                 unstruct_times[n_i,r_i,t_i] = toc() # <- stop
                 tic() # <- start
-                Lsym,psym,rsym,Lskew,pskew,rskew = StructCentro2(A)
-                struct_times[n_i,r_i,t_i] = toc() # <- stop
+                X = A[1:m,1:m]
+                Y = A[1:m,end:-1:m+1]
+                B = X + Y
+                C = X - Y
+                setup_times[n_i,r_i,t_i] = toc()
+                tic()
+                Asym,psym,rsym,_ = LAPACK.pstrf!('L', B, tol)
+                Askew,pskew,rskew,_ = LAPACK.pstrf!('L', C, tol)
+                fact_times[n_i,r_i,t_i] = toc() # <- stop
             end
         end
     end
-    display(mean(unstruct_times,3)./mean(struct_times,3))
-    println()
-    display(mean(unstruct_times./struct_times,3))
+    struct_times = setup_times + fact_times
+    #    display(mean(unstruct_times,3)./mean(struct_times,3))
+    #    println()
+    #    display(mean(unstruct_times./struct_times,3))
+    #    println()
+    #    display(mean(fact_times,3)./mean(struct_times,3))
+    for n_i=1:length(n_range)
+        Tu1 = mean(unstruct_times[n_i,1,:])
+        Ts1 = mean(struct_times[n_i,1,:])
+        Tsetup1 = mean(setup_times[n_i,1,:])
+        Tu2 = mean(unstruct_times[n_i,2,:])
+        Ts2 = mean(struct_times[n_i,2,:])
+        Tsetup2 = mean(setup_times[n_i,2,:])
+        t = [Tu1/Ts1, Tsetup1/Ts1, Tu2/Ts2, Tsetup2/Ts2]
+        println(n_range[n_i]," & ",t[1]," & ",t[2],
+                " & ",t[3]," & ",t[4],"  \\rule[-4pt]{0pt}{14pt}\\\\")
+    end
+#    n_range = [1500, 3000, 4500, 6000]
+    speedup1 = zeros(length(n_range),2)
+    for n_i = 1:length(n_range)
+        n = n_range[n_i]
+        m = convert(Int64,n/2)
+        r_range = [(m,m), (n/100,n/100)]
+        for r_i = 1:length(r_range)
+            r1,r2 = convert((Int64,Int64),r_range[r_i])
+            r = r1+r2
+#            println("n: ",n,", r1: ",r1,", r2: ",r2)
+            speedup1[n_i,r_i] = 2r^2/(2n+r1^2+r2^2)
+        end
+    end
+    #display(speedup)
+    #println()
+    speedup2 = zeros(length(n_range),2)
+    for n_i = 1:length(n_range)
+        n = n_range[n_i]
+        m = convert(Int64,n/2)
+        r_range = [(m,m), (n/100,n/100)]
+        for r_i = 1:length(r_range)
+            r1,r2 = convert((Int64,Int64),r_range[r_i])
+            r = r1+r2
+#            println("n: ",n,", r1: ",r1,", r2: ",r2)
+            speedup2[n_i,r_i] = 2n/(2n+r1^2+r2^2)
+        end
+    end
+    #display(speedup)
+    #println()
+    for n_i=1:length(n_range)
+#        t = [Tu1/Ts1, Tsetup1/Ts1, Tu2/Ts2, Tsetup2/Ts2]
+        t = [speedup1[n_i,1], speedup2[n_i,1], 
+             speedup1[n_i,2], speedup2[n_i,2]]
+        println(n_range[n_i]," & ",t[1]," & ",t[2],
+                " & ",t[3]," & ",t[4],"  \\rule[-4pt]{0pt}{14pt}\\\\")
+    end
 end
 
 function UnStructCheck(L,piv,rank)
@@ -283,4 +341,4 @@ end
 SizeRankVersusSpeedup()
 #TestRank()
 #CompareStructCentro()
-PredictedSpeedup()
+#PredictedSpeedup()
