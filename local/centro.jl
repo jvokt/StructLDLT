@@ -4,7 +4,7 @@ function SizeRankVersusSpeedup()
     # ratio of L,piv,rank = UnStructCentro(A) time divided
     # by Lsym,psym,rsym,Lskew,pskew,rskew = StructCentro(A) time
     tol = 1e-6
-    trials = 15
+    trials = 10
     num_ranks = 2
     n_range = [1500, 3000, 4500, 6000]
     unstruct_times = zeros(length(n_range),num_ranks)

@@ -5,7 +5,7 @@ function SizeRankVersusSpeedup()
     # by Lsym,psym,rsym,Lskew,pskew,rskew = StructPerfShuff(A) time
     
     tol = 1e-6
-    trials = 15
+    trials = 10
     num_ranks = 2
     # n_range = [20, 40, 60, 80]#, 100]
     n_range = [39, 55, 67, 77]
