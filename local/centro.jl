@@ -3,13 +3,13 @@ function SizeRankVersusSpeedup()
     # versus (r1,r2) = (m,m), (m,n/10), (m,0), (n/100,n/100), (n/100,0)
     # ratio of L,piv,rank = UnStructCentro(A) time divided
     # by Lsym,psym,rsym,Lskew,pskew,rskew = StructCentro(A) time
-
     tol = 1e-6
-    trials = 5#0
+    trials = 15
+    num_ranks = 2
     n_range = [1500, 3000, 4500, 6000]
-    unstruct_times = zeros(length(n_range),2,trials)
-    setup_times = zeros(length(n_range),2,trials)
-    fact_times = zeros(length(n_range),2,trials)
+    unstruct_times = zeros(length(n_range),num_ranks)
+    setup_times = zeros(length(n_range),num_ranks)
+    fact_times = zeros(length(n_range),num_ranks)
     for n_i = 1:length(n_range)
         n = n_range[n_i]
         m = convert(Int64,n/2)
@@ -20,43 +20,55 @@ function SizeRankVersusSpeedup()
             println("n: ",n,", r1: ",r1,", r2: ",r2)
             B,C = RandCentro(n,r1,r2)
             A = FullCentro(B,C)
+            As = zeros(Any,trials)
+            Bs = zeros(Any,trials)
+            Cs = zeros(Any,trials)
+            for i=1:trials
+                As[i] = deepcopy(A)
+                Bs[i] = deepcopy(B)
+                Cs[i] = deepcopy(C)
+            end
+            tic()
             for t_i = 1:trials
-                Atemp = deepcopy(A)
-                tic() # <- start
-                L,piv,rank,_ = UnStructCentro(Atemp)
-                unstruct_times[n_i,r_i,t_i] = toc() # <- stop
-                tic() # <- start
+                LAPACK.pstrf!('L', As[t_i], tol)
+            end
+            unstruct_times[n_i,r_i] = toc()
+
+            tic()
+            for t_i = 1:trials
                 X = A[1:m,1:m]
                 Y = A[1:m,end:-1:m+1]
                 B = X + Y
                 C = X - Y
-                setup_times[n_i,r_i,t_i] = toc()
-                tic()
-                Asym,psym,rsym,_ = LAPACK.pstrf!('L', B, tol)
-                Askew,pskew,rskew,_ = LAPACK.pstrf!('L', C, tol)
-                fact_times[n_i,r_i,t_i] = toc() # <- stop
             end
+            setup_times[n_i,r_i] = toc()
+
+            tic()
+            for t_i = 1:trials
+                LAPACK.pstrf!('L', Bs[t_i], tol)
+                LAPACK.pstrf!('L', Cs[t_i], tol)
+            end
+            fact_times[n_i,r_i] = toc()
         end
-    end
+    end    
     struct_times = setup_times + fact_times
-    #    display(mean(unstruct_times,3)./mean(struct_times,3))
-    #    println()
-    #    display(mean(unstruct_times./struct_times,3))
-    #    println()
-    #    display(mean(fact_times,3)./mean(struct_times,3))
     for n_i=1:length(n_range)
-        Tu1 = mean(unstruct_times[n_i,1,:])
-        Ts1 = mean(struct_times[n_i,1,:])
-        Tsetup1 = mean(setup_times[n_i,1,:])
-        Tu2 = mean(unstruct_times[n_i,2,:])
-        Ts2 = mean(struct_times[n_i,2,:])
-        Tsetup2 = mean(setup_times[n_i,2,:])
-        t = [Tu1/Ts1, Tsetup1/Ts1, Tu2/Ts2, Tsetup2/Ts2]
+        Tu1 = unstruct_times[n_i,1]
+        Ts1 = struct_times[n_i,1]
+        Tsetup1 = setup_times[n_i,1]
+        Tu2 = unstruct_times[n_i,2]
+        Ts2 = struct_times[n_i,2]
+        Tsetup2 = setup_times[n_i,2]
+        t = round([Tu1/Ts1, Tsetup1/Ts1, Tu2/Ts2, Tsetup2/Ts2],2)
         println(n_range[n_i]," & ",t[1]," & ",t[2],
                 " & ",t[3]," & ",t[4],"  \\rule[-4pt]{0pt}{14pt}\\\\")
     end
-#    n_range = [1500, 3000, 4500, 6000]
-    speedup1 = zeros(length(n_range),2)
+end
+
+function PredictedSpeedups()
+    n_range = [1500, 3000, 4500, 6000]
+    num_ranks = 2
+    speedup1 = zeros(length(n_range),num_ranks)
     for n_i = 1:length(n_range)
         n = n_range[n_i]
         m = convert(Int64,n/2)
@@ -68,9 +80,9 @@ function SizeRankVersusSpeedup()
             speedup1[n_i,r_i] = 2r^2/(2n+r1^2+r2^2)
         end
     end
-    #display(speedup)
-    #println()
-    speedup2 = zeros(length(n_range),2)
+    display(speedup1)
+    println()
+    speedup2 = zeros(length(n_range),num_ranks)
     for n_i = 1:length(n_range)
         n = n_range[n_i]
         m = convert(Int64,n/2)
@@ -82,12 +94,45 @@ function SizeRankVersusSpeedup()
             speedup2[n_i,r_i] = 2n/(2n+r1^2+r2^2)
         end
     end
-    #display(speedup)
-    #println()
+    display(speedup2)
+    println()
+    speedup3 = zeros(length(n_range),num_ranks)
+    for n_i = 1:length(n_range)
+        n = n_range[n_i]
+        m = convert(Int64,n/2)
+        r_range = [(m,m), (n/100,n/100)]
+        for r_i = 1:length(r_range)
+            r1,r2 = convert((Int64,Int64),r_range[r_i])
+            r = r1+r2
+#            println("n: ",n,", r1: ",r1,", r2: ",r2)
+            speedup3[n_i,r_i] = 2r^2/(2r+r1^2+r2^2)
+        end
+    end
+    display(speedup3)
+    println()
+    speedup4 = zeros(length(n_range),num_ranks)
+    for n_i = 1:length(n_range)
+        n = n_range[n_i]
+        m = convert(Int64,n/2)
+        r_range = [(m,m), (n/100,n/100)]
+        for r_i = 1:length(r_range)
+            r1,r2 = convert((Int64,Int64),r_range[r_i])
+            r = r1+r2
+#            println("n: ",n,", r1: ",r1,", r2: ",r2)
+            speedup4[n_i,r_i] = 2r/(2r+r1^2+r2^2)
+        end
+    end
+    display(speedup4)
+    println()
     for n_i=1:length(n_range)
-#        t = [Tu1/Ts1, Tsetup1/Ts1, Tu2/Ts2, Tsetup2/Ts2]
-        t = [speedup1[n_i,1], speedup2[n_i,1], 
-             speedup1[n_i,2], speedup2[n_i,2]]
+        t = round([speedup1[n_i,1], speedup2[n_i,1],
+             speedup1[n_i,2], speedup2[n_i,2]],2)
+        println(n_range[n_i]," & ",t[1]," & ",t[2],
+                " & ",t[3]," & ",t[4],"  \\rule[-4pt]{0pt}{14pt}\\\\")
+    end
+    for n_i=1:length(n_range)
+        t = round([speedup3[n_i,1], speedup4[n_i,1],
+             speedup3[n_i,2], speedup4[n_i,2]],2)
         println(n_range[n_i]," & ",t[1]," & ",t[2],
                 " & ",t[3]," & ",t[4],"  \\rule[-4pt]{0pt}{14pt}\\\\")
     end
@@ -153,16 +198,16 @@ function RandCentro(n,r1,r2)
     return B,C
 end
 
-function lapack_chol(A,tol=1e-6)
-    A, piv, rank, info = LAPACK.pstrf!('L', A, tol)
-    A[piv,:] = tril(A)
-    return A[:,1:rank]
-end
-
 function FullCentro(B,C)
     X = (1/2)*(B + C)
     Y = (1/2)*(B - C)
     return [X Y[:,end:-1:1]; Y[end:-1:1,:] X[end:-1:1,end:-1:1]]
+end
+
+function lapack_chol(A,tol=1e-6)
+    A, piv, rank, info = LAPACK.pstrf!('L', A, tol)
+    A[piv,:] = tril(A)
+    return A[:,1:rank]
 end
 
 function UnStructCentro(A,tol=1e-6)
@@ -341,4 +386,4 @@ end
 SizeRankVersusSpeedup()
 #TestRank()
 #CompareStructCentro()
-#PredictedSpeedup()
+#PredictedSpeedups()

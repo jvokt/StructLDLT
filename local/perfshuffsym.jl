@@ -5,36 +5,176 @@ function SizeRankVersusSpeedup()
     # by Lsym,psym,rsym,Lskew,pskew,rskew = StructPerfShuff(A) time
     
     tol = 1e-6
-    trials = 5#0
-    n_range = [20, 40, 60, 80]#, 100]
-    unstruct_times = zeros(length(n_range),5,trials)
-    struct_times = zeros(length(n_range),5,trials)
+    trials = 15
+    num_ranks = 2
+    # n_range = [20, 40, 60, 80]#, 100]
+    n_range = [39, 55, 67, 77]
+    unstruct_times = zeros(length(n_range),num_ranks,trials)
+    setup_times = zeros(length(n_range),num_ranks,trials)
+    fact_times = zeros(length(n_range),num_ranks,trials)
     for n_i = 1:length(n_range)
         n = n_range[n_i]
         nsym = convert(Int64,n*(n+1)/2)
         nskew = convert(Int64,n*(n-1)/2)
-        r_range = [(nsym,nskew), (nsym,6n), (nsym,0), (6n,6n), (6n,0)]
+        r_range = [(nsym,nskew), (n,n)]
         for r_i = 1:length(r_range)
             r1,r2 = convert((Int64,Int64),r_range[r_i])
             r = r1+r2
             println("n: ",n,", r1: ",r1,", r2: ",r2)
-            A = RandPerfShuff(n,r1,r2)
-            for t_i = 1:trials
-                Atemp = deepcopy(A)
-                tic() # <- start
-                UnStructPerfShuff(Atemp)
-                unstruct_times[n_i,r_i,t_i] = toc() # <- stop
-                # UnStructCheck(A,L,piv,rank)
-                tic() # <- start
-                StructPerfShuff2(A)
-                struct_times[n_i,r_i,t_i] = toc() # <- stop
-                # StructCheck(A,Lsym,psym,rsym,Lskew,pskew,rskew)
+            B,C = RandPerfShuff(n,r1,r2)
+            A = FullPerfShuff(B,C,n)
+            As = zeros(Any,trials)
+            Bs = zeros(Any,trials)
+            Cs = zeros(Any,trials)
+            for i=1:trials
+                As[i] = deepcopy(A)
+                Bs[i] = deepcopy(B)
+                Cs[i] = deepcopy(C)
             end
+            tic()
+            for t_i = 1:trials
+                LAPACK.pstrf!('L', As[t_i], tol)
+            end
+            unstruct_times[n_i,r_i] = toc()
+
+            tic()
+            for t_i = 1:trials
+                PS = PerfShuff(n,n)
+                sym_indices = SymIndices(n)
+                X = A[sym_indices,sym_indices]
+                Y = A[sym_indices,PS[sym_indices]]
+                B = X + Y
+                skew_indices = SkewIndices(n)
+                X = A[skew_indices,skew_indices]
+                Y = A[skew_indices,PS[skew_indices]]
+                C = X - Y
+            end
+            setup_times[n_i,r_i] = toc()
+
+            tic()
+            for t_i = 1:trials
+                LAPACK.pstrf!('L', Bs[t_i], tol)
+                LAPACK.pstrf!('L', Cs[t_i], tol)
+            end
+            fact_times[n_i,r_i] = toc()
         end
     end
-    display(mean(unstruct_times,3)./mean(struct_times,3))
+    struct_times = setup_times + fact_times
+    for n_i=1:length(n_range)
+        Tu1 = mean(unstruct_times[n_i,1,:])
+        Ts1 = mean(struct_times[n_i,1,:])
+        Tsetup1 = mean(setup_times[n_i,1,:])
+        Tu2 = mean(unstruct_times[n_i,2,:])
+        Ts2 = mean(struct_times[n_i,2,:])
+        Tsetup2 = mean(setup_times[n_i,2,:])
+        t = round([Tu1/Ts1, Tsetup1/Ts1, Tu2/Ts2, Tsetup2/Ts2],2)
+        println(n_range[n_i]," & ",t[1]," & ",t[2],
+                " & ",t[3]," & ",t[4],"  \\rule[-4pt]{0pt}{14pt}\\\\")
+    end
+end
+
+function DevectorizedSetup()
+#                B = zeros(nsym,nsym)
+#                C = zeros(nskew,nskew)
+                #  sympacked(i,j) = i-(1/2)(j-1)j+(j-1)n
+                #  skewpacked(i,j) = i-(1/2)(j-1)j-j+(j-1)n
+#                for j=1:n
+#                    for i=j:n
+#                        for l=1:n
+#                            for k=l:n
+#                                p = i+(j-1)n
+#                                q = k+(l-1)n
+#                                rsym = i-(1/2)*(j-1)j+(j-1)n
+#                                rskew = i-(1/2)*(j-1)j-j+(j-1)n
+#                                ssym = k-(1/2)*(l-1)l+(l-1)n
+#                                sskew = k-(1/2)*(l-1)l-l+(l-1)n
+#                                if i > j && k > l
+#                                    # C
+#                                    C[rskew,sskew] = A[p,q]-A[p,PS[q]]
+#                                end
+                                # B
+#                                B[rsym,ssym] = A[p,q]+A[p,PS[q]]
+#                            end
+#                        end
+#                    end
+#                end
+end
+
+function PredictedSpeedups()
+    n_range = [39, 55, 67, 77]
+    num_ranks = 2
+    speedup1 = zeros(length(n_range),num_ranks)
+    for n_i = 1:length(n_range)
+        n = n_range[n_i]
+        nsym = convert(Int64,n*(n+1)/2)
+        nskew = convert(Int64,n*(n-1)/2)
+        r_range = [(nsym,nskew), (n,n)]
+        for r_i = 1:length(r_range)
+            r1,r2 = convert((Int64,Int64),r_range[r_i])
+            r = r1+r2
+#            println("n: ",n,", r1: ",r1,", r2: ",r2)
+            speedup1[n_i,r_i] = 2n*r^2/(2n*(n^2+1)+(n+1)*r1^2+(n-1)r2^2)
+        end
+    end
+    display(speedup1)
     println()
-    display(mean(unstruct_times./struct_times,3))
+    speedup2 = zeros(length(n_range),num_ranks)
+    for n_i = 1:length(n_range)
+        n = n_range[n_i]
+        nsym = convert(Int64,n*(n+1)/2)
+        nskew = convert(Int64,n*(n-1)/2)
+        r_range = [(nsym,nskew), (n,n)]
+        for r_i = 1:length(r_range)
+            r1,r2 = convert((Int64,Int64),r_range[r_i])
+            r = r1+r2
+#            println("n: ",n,", r1: ",r1,", r2: ",r2)
+            speedup2[n_i,r_i] = 2n*(n^2+1)/(2n*(n^2+1)+(n+1)r1^2+(n-1)r2^2)
+        end
+    end
+    display(speedup2)
+    println()
+    speedup3 = zeros(length(n_range),num_ranks)
+    for n_i = 1:length(n_range)
+        n = n_range[n_i]
+        nsym = convert(Int64,n*(n+1)/2)
+        nskew = convert(Int64,n*(n-1)/2)
+        r_range = [(nsym,nskew), (n,n)]
+        for r_i = 1:length(r_range)
+            r1,r2 = convert((Int64,Int64),r_range[r_i])
+            r = r1+r2
+#            println("n: ",n,", r1: ",r1,", r2: ",r2)
+            speedup3[n_i,r_i] = 2n*r^2/((n+1)*r1*(r1+2)+(n-1)*r2*(r2+2))
+        end
+    end
+    display(speedup3)
+    println()
+    speedup4 = zeros(length(n_range),num_ranks)
+    for n_i = 1:length(n_range)
+        n = n_range[n_i]
+        nsym = convert(Int64,n*(n+1)/2)
+        nskew = convert(Int64,n*(n-1)/2)
+        r_range = [(nsym,nskew), (n,n)]
+        for r_i = 1:length(r_range)
+            r1,r2 = convert((Int64,Int64),r_range[r_i])
+            r = r1+r2
+#            println("n: ",n,", r1: ",r1,", r2: ",r2)
+            speedup4[n_i,r_i] = 2((n+1)r1+(n-1)r2)/((n+1)*r1*(r1+2)+(n-1)*r2*(r2+2))
+        end
+    end
+    display(speedup4)
+    println()
+    for n_i=1:length(n_range)
+        t = round([speedup1[n_i,1], speedup2[n_i,1],
+             speedup1[n_i,2], speedup2[n_i,2]],2)
+        println(n_range[n_i]," & ",t[1]," & ",t[2],
+                " & ",t[3]," & ",t[4],"  \\rule[-4pt]{0pt}{14pt}\\\\")
+    end
+    for n_i=1:length(n_range)
+        t = round([speedup3[n_i,1], speedup4[n_i,1],
+             speedup3[n_i,2], speedup4[n_i,2]],2)
+        println(n_range[n_i]," & ",t[1]," & ",t[2],
+                " & ",t[3]," & ",t[4],"  \\rule[-4pt]{0pt}{14pt}\\\\")
+    end
 end
 
 function UnStructCheck(A,L,piv,rank)
@@ -310,6 +450,53 @@ function CompareRand()
     end
 end
 
+function SkewInSymIndices(n)
+    nskew = int(n*(n-1)/2)
+    indices = zeros(Int64,nskew)
+    idx = 1
+    idx2 = 1
+    for j=1:n
+        for i=j:n
+            if i > j
+                indices[idx] = idx2
+                idx += 1
+            end
+            idx2 += 1
+        end
+    end
+    return indices
+end
+
+function RandPerfShuff(n,r1,r2)
+    # Returns a rank-r matrix with Perfect Shuffle Symmetry
+    nsym = convert(Int64,n*(n+1)/2)
+    nskew = convert(Int64,n*(n-1)/2)
+    B = randn(nsym,r1)
+    B = B*B'
+    C = randn(nskew,r2)
+    C = C*C'
+    return B,C
+end
+
+function FullPerfShuff(B,C,n)
+    PS = PerfShuff(n,n)
+    sym = SymIndices(n)
+    skew = SkewIndices(n)
+    
+    A1 = zeros(n^2,n^2)
+    A1[sym,sym] = B
+    A1[PS[sym],PS[sym]] = B
+    A1[sym,PS[sym]] = B
+    A1[PS[sym],sym] = B
+    
+    A2 = zeros(n^2,n^2)
+    A2[skew,skew] = C
+    A2[PS[skew],PS[skew]] = C
+    A2[skew,PS[skew]] = -C
+    A2[PS[skew],skew] = -C
+    return A1+A2
+end
+
 function RandPerfShuff1(n,r1,r2)
     # Returns a rank-r matrix with Perfect Shuffle Symmetry
     nsym = convert(Int64,n*(n+1)/2)
@@ -324,7 +511,7 @@ function RandPerfShuff1(n,r1,r2)
     return X + Y
 end
 
-function RandPerfShuff(n,r1,r2)
+function RandPerfShuff2(n,r1,r2)
     # Returns a rank-r matrix with Perfect Shuffle Symmetry
     nsym = convert(Int64,n*(n+1)/2)
     nskew = convert(Int64,n*(n-1)/2)
@@ -642,10 +829,10 @@ function PredictedSpeedup()
     println()
 end
 
-#SizeRankVersusSpeedup()
+SizeRankVersusSpeedup()
 #TestRank()
 #CompareSymUnpackRows()
 #CompareRand()
 #CompareSymBlock()
 #CompareStructPerfShuff()
-#PredictedSpeedup()
+#PredictedSpeedups()
