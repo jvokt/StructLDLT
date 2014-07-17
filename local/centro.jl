@@ -20,14 +20,14 @@ function SizeRankVersusSpeedup()
             println("n: ",n,", r1: ",r1,", r2: ",r2)
             B,C = RandCentro(n,r1,r2)
             A = FullCentro(B,C)
-            As = zeros(Any,trials)
-            Bs = zeros(Any,trials)
-            Cs = zeros(Any,trials)
-            for i=1:trials
-                As[i] = deepcopy(A)
-                Bs[i] = deepcopy(B)
-                Cs[i] = deepcopy(C)
-            end
+            As = [deepcopy(A) for i=1:trials]
+            Bs = [deepcopy(B) for i=1:trials]
+            Cs = [deepcopy(C) for i=1:trials]
+#            for i=1:trials
+#                As[i] = deepcopy(A)
+#                Bs[i] = deepcopy(B)
+#                Cs[i] = deepcopy(C)
+#            end
             tic()
             for t_i = 1:trials
                 LAPACK.pstrf!('L', As[t_i], tol)
