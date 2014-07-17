@@ -5,7 +5,7 @@ function TestIntegralTransformation()
     molecules = ["HF","NH3","H2O2","N2H4","C2H5OH"]
     num_basis_fns = [34, 48, 68, 82, 123]
     ranks = [200, 300, 400, 500, 750]
-    nmols = 4#length(num_basis_fns)
+    nmols = 5#length(num_basis_fns)
     gen_plots = false
     tol = 1e-6
     
@@ -32,7 +32,7 @@ function TestIntegralTransformation()
     struct_trans_space = zeros(nmols)
     struct_trans_error = zeros(nmols)    
     
-    for i=4:5
+    for i=1:5
         molecule = molecules[i]
         n = num_basis_fns[i]
         r = ranks[i]
@@ -55,15 +55,19 @@ function TestIntegralTransformation()
 
         println("Chol-MP")
         tic()
-        L = lapack_chol(A2)
-        n2,r = size(L)
+#        L = lapack_chol(A2)
+#         A2, piv, rank, info = LAPACK.pstrf!('L', A2, tol)
+#        A[piv,:] = tril(A)
+#        n2,r = size(L)
+#	 L = A2[:,1:rank]
+	 L = blocked_full_fact_row_major(A2,tol,96)
+	 n2,r = size(L)
         B1 = C*reshape(L,n,n*r)
         B2 = C*reshape(permutedims(reshape(B1,n,n,r),[2 1 3]),n,n*r)
-        B3 = reshape(permutedims(reshape(B2,n,n,r),[2 1 3]),n2,r)
+        B3 = reshape(permutedims(reshape(B2,n,n,r),[2 1 3]),n^2,r)
         full_trans_time[i] = toc()
 
         println("Q-Chol-MP")
-        tic()
         nsym = int(n*(n+1)/2)
         sym_indices = zeros(Int64,nsym)
         idx = 1
@@ -73,8 +77,13 @@ function TestIntegralTransformation()
                 idx += 1
             end
         end
-        B = A3#[sym_indices,sym_indices]
-        L = lapack_chol(B)
+        tic()
+#        B = A3#[sym_indices,sym_indices]
+#        L = lapack_chol(B)
+#	A3, piv, rank, info = LAPACK.pstrf!('L', A3, tol)
+#        A[piv,:] = tril(A)
+#        L = A3[:,1:rank]
+	 L = blocked_full_fact_row_major(A3,tol,96)
         nsym,r = size(L)
         PS = PerfShuff(n,n)
         n2 = n^2
@@ -86,6 +95,9 @@ function TestIntegralTransformation()
         B3 = reshape(permutedims(reshape(B2,n,n,r),[2 1 3]),n2,r)
         struct_trans_time[i] = toc()
     end
+    println(unfact_trans_time)
+    println(full_trans_time)
+    println(struct_trans_time)
     
     if gen_plots
         plotComparison(num_basis_fns[1:nmols],

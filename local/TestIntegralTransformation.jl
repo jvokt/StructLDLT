@@ -11,7 +11,8 @@ function tuned_algorithm()
             "Tuned Algorithm 4.1 plus Cholesky factor transform"]
     style = ["wo","go"]
     full_timings = zeros(nmols)
-    tuned_timings = zeros(nmols)
+    chol_timings = zeros(nmols)
+    qchol_timings = zeros(nmols)
     full_errors = zeros(nmols)
     tuned_errors = zeros(nmols)
     for i=1:nmols
@@ -26,17 +27,23 @@ function tuned_algorithm()
         tic()
         M = unfact_trans(A,C)
         full_timings[i] = toc()
-        full_errors[i] = trace(kron(C,C)*A*kron(C,C)'-M)
-        println("Error: ",full_errors[i])
-        
+#        full_errors[i] = trace(kron(C,C)*A*kron(C,C)'-M)
+#        println("Error: ",full_errors[i])
+	         
         tic()
         L = blocked_full_fact_row_major(A,tol,nb)
         G = half_trans(L,C)
-        tuned_timings[i] = toc()
-        tuned_errors[i] = trace(kron(C,C)*A*kron(C,C)'-G*G')
-        println("Error: ", tuned_errors[i])
+        chol_timings[i] = toc()
+	Asym = randn(int(n*(n+1)/2),r)
+	Asym = Asym*Asym'
+        tic()
+        Lsym = blocked_full_fact_row_major(Asym,tol,nb)
+        G = half_trans(L,C)
+        qchol_timings[i] = toc()
+#        tuned_errors[i] = trace(kron(C,C)*A*kron(C,C)'-G*G')
+#        println("Error: ", tuned_errors[i])
     end
-    
+    if false   
     figure()
     plot(num_basis_fns[1:nmols],full_timings,style[1],label=algs[1])
     plot(num_basis_fns[1:nmols],tuned_timings,style[2],label=algs[2])
@@ -53,6 +60,9 @@ function tuned_algorithm()
     ylabel("Trace norm error")
     title("State-of-the-art versus new tuned algorithm error")
     savefig(string("State-of-the-art versus new tuned algorithm error",".png"))
+    end
+    println(full_timings)
+    println(tuned_timings)
 end
 
 function tune_memory_layout()
@@ -160,7 +170,7 @@ function TestIntegralTransformation()
         println("Unfactorized transformation")
         tic()
         M = unfact_trans(A,C)
-        unfact_time[i] = toc()
+        unfact_trans_time[i] = toc()
         unfact_error[i] = trace(kron(C,C)*A*kron(C,C)'-M)
         println("error: ",unfact_error[i])
 
@@ -1989,7 +1999,7 @@ function read_ten_unfold_plot(molecule)
     # Read "molecule".ten into a tensor, unfold as a matrix, plot eigenvalues
 end
 
-#TestIntegralTransformation()
+TestIntegralTransformation()
 #TestStructTransform()
 #TestDsptrfL()
 #test_facts()
