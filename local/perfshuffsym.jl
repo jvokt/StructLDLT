@@ -4,7 +4,7 @@ function SizeRankVersusSpeedup()
     # ratio of L,piv,rank = UnStructPerfShuff(A) time divided
     # by Lsym,psym,rsym,Lskew,pskew,rskew = StructPerfShuff(A) time    
     tol = 1e-6
-    trials = 10
+    trials = 2#10
     num_ranks = 2
     n_range = [39, 55, 67, 77]
     unstruct_times = zeros(length(n_range),num_ranks)
@@ -22,26 +22,49 @@ function SizeRankVersusSpeedup()
             B,C = RandPerfShuff(n,r1,r2)
             A = FullPerfShuff(B,C,n)
 
+            if r_i == 1
+                tic()
+                for i=1:trials
+                    LAPACK.potrf!('L', copy(A))
+                end
+                unstruct_times[n_i,r_i] = toc()/trials                
+            else
+                tic()
+                for i=1:trials
+                    LAPACK.pstrf!('L', copy(A), tol)
+                end
+                unstruct_times[n_i,r_i] = toc()/trials
+            end
+            
             tic()
-            L,piv,rank,_ = LAPACK.pstrf!('L', As[t_i], tol)
-            unstruct_times[n_i,r_i] = toc()
-
-            tic()
-            PS = PerfShuff(n,n)
-            sym_indices = SymIndices(n)
-            X = A[sym_indices,sym_indices]
-            Y = A[sym_indices,PS[sym_indices]]
-            B = X + Y
-            skew_indices = SkewIndices(n)
-            X = A[skew_indices,skew_indices]
-            Y = A[skew_indices,PS[skew_indices]]
-            C = X - Y
-            setup_times[n_i,r_i] = toc()
-
-            tic()
-            Lsym,psym,rsym,_ = LAPACK.pstrf!('L', B, tol)
-            Lskew,pskew,rskew,_ = LAPACK.pstrf!('L', C, tol)
-            fact_times[n_i,r_i] = toc()
+            for i=1:trials
+                PS = PerfShuff(n,n)
+                sym_indices = SymIndices(n)
+                X = A[sym_indices,sym_indices]
+                Y = A[sym_indices,PS[sym_indices]]
+                B = X + Y
+                skew_indices = SkewIndices(n)
+                X = A[skew_indices,skew_indices]
+                Y = A[skew_indices,PS[skew_indices]]
+                C = X - Y
+            end
+            setup_times[n_i,r_i] = toc()/trials
+            
+            if r_i == 1
+                tic()
+                for i=1:trials
+                    LAPACK.potrf!('L', copy(B))
+                    LAPACK.potrf!('L', copy(C))
+                end
+                fact_times[n_i,r_i] = toc()/trials                
+            else
+                tic()
+                for i=1:trials
+                    LAPACK.pstrf!('L', copy(B), tol)
+                    LAPACK.pstrf!('L', copy(C), tol)
+                end
+                fact_times[n_i,r_i] = toc()/trials
+            end
         end
     end
     struct_times = setup_times + fact_times

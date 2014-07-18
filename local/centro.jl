@@ -4,7 +4,7 @@ function SizeRankVersusSpeedup()
     # ratio of L,piv,rank = UnStructCentro(A) time divided
     # by Lsym,psym,rsym,Lskew,pskew,rskew = StructCentro(A) time
     tol = 1e-6
-    trials = 10
+    trials = 2#10
     num_ranks = 2
     n_range = [1500, 3000, 4500, 6000]
     unstruct_times = zeros(length(n_range),num_ranks)
@@ -20,22 +20,45 @@ function SizeRankVersusSpeedup()
             println("n: ",n,", r1: ",r1,", r2: ",r2)
             B,C = RandCentro(n,r1,r2)
             A = FullCentro(B,C)
-
-            tic()
-            L,piv,rank,_ = LAPACK.pstrf!('L', A, tol)
-            unstruct_times[n_i,r_i] = toc()
-
-            tic()
-            X = A[1:m,1:m]
-            Y = A[1:m,end:-1:m+1]
-            B = X + Y
-            C = X - Y
-            setup_times[n_i,r_i] = toc()
+            
+            if r_i == 1
+                tic()
+                for i=1:trials
+                    LAPACK.potrf!('L', copy(A))
+                end
+                unstruct_times[n_i,r_i] = toc()/trials                
+            else
+                tic()
+                for i=1:trials
+                    LAPACK.pstrf!('L', copy(A), tol)
+                end
+                unstruct_times[n_i,r_i] = toc()/trials
+            end
             
             tic()
-            Lsym,psym,rsym,_ = LAPACK.pstrf!('L', B, tol)
-            Lskew,pskew,rskew,_ = LAPACK.pstrf!('L', C, tol)
-            fact_times[n_i,r_i] = toc()
+            for i=1:trials
+                X = A[1:m,1:m]
+                Y = A[1:m,end:-1:m+1]
+                B = X + Y
+                C = X - Y
+            end
+            setup_times[n_i,r_i] = toc()/trials
+            
+            if r_i == 1
+                tic()
+                for i=1:trials
+                    LAPACK.potrf!('L', copy(B))
+                    LAPACK.potrf!('L', copy(C))
+                end
+                fact_times[n_i,r_i] = toc()/trials                
+            else
+                tic()
+                for i=1:trials
+                    LAPACK.pstrf!('L', copy(B), tol)
+                    LAPACK.pstrf!('L', copy(C), tol)
+                end
+                fact_times[n_i,r_i] = toc()/trials
+            end
         end
     end    
     struct_times = setup_times + fact_times
