@@ -21,53 +21,37 @@ function SizeRankVersusSpeedup()
             println("n: ",n,", r1: ",r1,", r2: ",r2)
             B,C = RandPerfShuff(n,r1,r2)
             A = FullPerfShuff(B,C,n)
-            As = [deepcopy(A) for i=1:trials]
-            Bs = [deepcopy(B) for i=1:trials]
-            Cs = [deepcopy(C) for i=1:trials]
-            piv = zeros(n^2)
-            rank = 0
-            tic()
-            for t_i = 1:trials
-                L,piv,rank,_ = LAPACK.pstrf!('L', As[t_i], tol)
-            end
-            unstruct_times[n_i,r_i] = toc()
-            UnStructCheck(A,As[1],piv,rank)
 
             tic()
-            for t_i = 1:trials
-                PS = PerfShuff(n,n)
-                sym_indices = SymIndices(n)
-                X = A[sym_indices,sym_indices]
-                Y = A[sym_indices,PS[sym_indices]]
-                B = X + Y
-                skew_indices = SkewIndices(n)
-                X = A[skew_indices,skew_indices]
-                Y = A[skew_indices,PS[skew_indices]]
-                C = X - Y
-            end
+            L,piv,rank,_ = LAPACK.pstrf!('L', As[t_i], tol)
+            unstruct_times[n_i,r_i] = toc()
+
+            tic()
+            PS = PerfShuff(n,n)
+            sym_indices = SymIndices(n)
+            X = A[sym_indices,sym_indices]
+            Y = A[sym_indices,PS[sym_indices]]
+            B = X + Y
+            skew_indices = SkewIndices(n)
+            X = A[skew_indices,skew_indices]
+            Y = A[skew_indices,PS[skew_indices]]
+            C = X - Y
             setup_times[n_i,r_i] = toc()
 
-            psym = zeros(n^2)
-            rsym = 0
-            pskew = zeros(n^2)
-            rskew = 0
             tic()
-            for t_i = 1:trials
-                Lsym,psym,rsym,_ = LAPACK.pstrf!('L', Bs[t_i], tol)
-                Lskew,pskew,rskew,_ = LAPACK.pstrf!('L', Cs[t_i], tol)
-            end
+            Lsym,psym,rsym,_ = LAPACK.pstrf!('L', B, tol)
+            Lskew,pskew,rskew,_ = LAPACK.pstrf!('L', C, tol)
             fact_times[n_i,r_i] = toc()
-            StructCheck(A,Bs[1],psym,rsym,Cs[1],pskew,rskew)
         end
     end
     struct_times = setup_times + fact_times
     for n_i=1:length(n_range)
-        Tu1 = mean(unstruct_times[n_i,1,:])
-        Ts1 = mean(struct_times[n_i,1,:])
-        Tsetup1 = mean(setup_times[n_i,1,:])
-        Tu2 = mean(unstruct_times[n_i,2,:])
-        Ts2 = mean(struct_times[n_i,2,:])
-        Tsetup2 = mean(setup_times[n_i,2,:])
+        Tu1 = unstruct_times[n_i,1]
+        Ts1 = struct_times[n_i,1]
+        Tsetup1 = setup_times[n_i,1]
+        Tu2 = unstruct_times[n_i,2]
+        Ts2 = struct_times[n_i,2]
+        Tsetup2 = setup_times[n_i,2]
         t = round([Tu1/Ts1, Tsetup1/Ts1, Tu2/Ts2, Tsetup2/Ts2],2)
         println(n_range[n_i]," & ",t[1]," & ",t[2],
                 " & ",t[3]," & ",t[4],"  \\rule[-4pt]{0pt}{14pt}\\\\")

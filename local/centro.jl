@@ -20,38 +20,22 @@ function SizeRankVersusSpeedup()
             println("n: ",n,", r1: ",r1,", r2: ",r2)
             B,C = RandCentro(n,r1,r2)
             A = FullCentro(B,C)
-            As = [deepcopy(A) for i=1:trials]
-            Bs = [deepcopy(B) for i=1:trials]
-            Cs = [deepcopy(C) for i=1:trials]
-            piv = zeros(n^2)
-            rank = 0
+
             tic()
-            for t_i = 1:trials
-                L,piv,rank,_ = LAPACK.pstrf!('L', As[t_i], tol)
-            end
+            L,piv,rank,_ = LAPACK.pstrf!('L', A, tol)
             unstruct_times[n_i,r_i] = toc()
-            UnStructCheck(A,As[1],piv,rank)
 
             tic()
-            for t_i = 1:trials
-                X = A[1:m,1:m]
-                Y = A[1:m,end:-1:m+1]
-                B = X + Y
-                C = X - Y
-            end
+            X = A[1:m,1:m]
+            Y = A[1:m,end:-1:m+1]
+            B = X + Y
+            C = X - Y
             setup_times[n_i,r_i] = toc()
-
-            psym = zeros(n^2)
-            rsym = 0
-            pskew = zeros(n^2)
-            rskew = 0
+            
             tic()
-            for t_i = 1:trials
-                Lsym,psym,rsym,_ = LAPACK.pstrf!('L', Bs[t_i], tol)
-                Lskew,pskew,rskew,_ = LAPACK.pstrf!('L', Cs[t_i], tol)
-            end
+            Lsym,psym,rsym,_ = LAPACK.pstrf!('L', B, tol)
+            Lskew,pskew,rskew,_ = LAPACK.pstrf!('L', C, tol)
             fact_times[n_i,r_i] = toc()
-            StructCheck(A,Bs[1],psym,rsym,Cs[1],pskew,rskew)
         end
     end    
     struct_times = setup_times + fact_times
