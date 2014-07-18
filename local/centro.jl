@@ -23,16 +23,14 @@ function SizeRankVersusSpeedup()
             As = [deepcopy(A) for i=1:trials]
             Bs = [deepcopy(B) for i=1:trials]
             Cs = [deepcopy(C) for i=1:trials]
-#            for i=1:trials
-#                As[i] = deepcopy(A)
-#                Bs[i] = deepcopy(B)
-#                Cs[i] = deepcopy(C)
-#            end
+            piv = zeros(n^2)
+            rank = 0
             tic()
             for t_i = 1:trials
-                LAPACK.pstrf!('L', As[t_i], tol)
+                L,piv,rank,_ = LAPACK.pstrf!('L', As[t_i], tol)
             end
             unstruct_times[n_i,r_i] = toc()
+            UnStructCheck(A,As[1],piv,rank)
 
             tic()
             for t_i = 1:trials
@@ -43,12 +41,17 @@ function SizeRankVersusSpeedup()
             end
             setup_times[n_i,r_i] = toc()
 
+            psym = zeros(n^2)
+            rsym = 0
+            pskew = zeros(n^2)
+            rskew = 0
             tic()
             for t_i = 1:trials
-                LAPACK.pstrf!('L', Bs[t_i], tol)
-                LAPACK.pstrf!('L', Cs[t_i], tol)
+                Lsym,psym,rsym,_ = LAPACK.pstrf!('L', Bs[t_i], tol)
+                Lskew,pskew,rskew,_ = LAPACK.pstrf!('L', Cs[t_i], tol)
             end
             fact_times[n_i,r_i] = toc()
+            StructCheck(A,Bs[1],psym,rsym,Cs[1],pskew,rskew)
         end
     end    
     struct_times = setup_times + fact_times
@@ -138,13 +141,13 @@ function PredictedSpeedups()
     end
 end
 
-function UnStructCheck(L,piv,rank)
+function UnStructCheck(A,L,piv,rank)
     L[piv,:] = tril(L)
     L = L[:,1:rank]
     println("error: ",norm(A-L*L'))
 end
 
-function StructCheck(Lsym,psym,rsym,Lskew,pskew,rskew)
+function StructCheck(A,Lsym,psym,rsym,Lskew,pskew,rskew)
     Lsym[psym,:] = tril(Lsym)
     Gsym = Lsym[:,1:rsym]
     Gsym = [Gsym; Gsym[end:-1:1,:]]/sqrt(2)

@@ -2,16 +2,14 @@ function SizeRankVersusSpeedup()
     # produce a table of n = 500, 1000, 1500, 2000
     # versus (r1,r2) = (m,m), (m,n/10), (m,0), (n/100,n/100), (n/100,0)
     # ratio of L,piv,rank = UnStructPerfShuff(A) time divided
-    # by Lsym,psym,rsym,Lskew,pskew,rskew = StructPerfShuff(A) time
-    
+    # by Lsym,psym,rsym,Lskew,pskew,rskew = StructPerfShuff(A) time    
     tol = 1e-6
     trials = 10
     num_ranks = 2
-    # n_range = [20, 40, 60, 80]#, 100]
     n_range = [39, 55, 67, 77]
-    unstruct_times = zeros(length(n_range),num_ranks,trials)
-    setup_times = zeros(length(n_range),num_ranks,trials)
-    fact_times = zeros(length(n_range),num_ranks,trials)
+    unstruct_times = zeros(length(n_range),num_ranks)
+    setup_times = zeros(length(n_range),num_ranks)
+    fact_times = zeros(length(n_range),num_ranks)
     for n_i = 1:length(n_range)
         n = n_range[n_i]
         nsym = convert(Int64,n*(n+1)/2)
@@ -26,16 +24,14 @@ function SizeRankVersusSpeedup()
             As = [deepcopy(A) for i=1:trials]
             Bs = [deepcopy(B) for i=1:trials]
             Cs = [deepcopy(C) for i=1:trials]
-#            for i=1:trials
-#                As[i] = deepcopy(A)
-#                Bs[i] = deepcopy(B)
-#                Cs[i] = deepcopy(C)
-#            end
+            piv = zeros(n^2)
+            rank = 0
             tic()
             for t_i = 1:trials
-                LAPACK.pstrf!('L', As[t_i], tol)
+                L,piv,rank,_ = LAPACK.pstrf!('L', As[t_i], tol)
             end
             unstruct_times[n_i,r_i] = toc()
+            UnStructCheck(A,As[1],piv,rank)
 
             tic()
             for t_i = 1:trials
@@ -51,12 +47,17 @@ function SizeRankVersusSpeedup()
             end
             setup_times[n_i,r_i] = toc()
 
+            psym = zeros(n^2)
+            rsym = 0
+            pskew = zeros(n^2)
+            rskew = 0
             tic()
             for t_i = 1:trials
-                LAPACK.pstrf!('L', Bs[t_i], tol)
-                LAPACK.pstrf!('L', Cs[t_i], tol)
+                Lsym,psym,rsym,_ = LAPACK.pstrf!('L', Bs[t_i], tol)
+                Lskew,pskew,rskew,_ = LAPACK.pstrf!('L', Cs[t_i], tol)
             end
             fact_times[n_i,r_i] = toc()
+            StructCheck(A,Bs[1],psym,rsym,Cs[1],pskew,rskew)
         end
     end
     struct_times = setup_times + fact_times
@@ -190,18 +191,21 @@ function StructCheck(A,Lsym,psym,rsym,Lskew,pskew,rskew)
     # StructCheck(A,Lsym,psym,rsym,Lskew,pskew,rskew)
     n2 = size(A,1)
     n = int(sqrt(n2))
-    nsym = int(n*(n+1)/2)
-    nskew = int(n*(n-1)/2)
-    s = snn(n)
-    Qsym,Qskew = Qnn(n)
+#    nsym = int(n*(n+1)/2)
+#    nskew = int(n*(n-1)/2)
+#    s = snn(n)
+#    Qsym,Qskew = Qnn(n)
     Lsym[psym,:] = tril(Lsym)
     #Gsym = scale(s,Lsym[:,1:rsym])
     #Gsym = Qsym*Gsym
-    Gsym = SymUnpackRows2(Lsym[:,1:rsym],n)
+    Gsym = Lsym[:,1:rsym]
+    
+#    Gsym = SymUnpackRows2(Lsym[:,1:rsym],n)
     Lskew[pskew,:] = tril(Lskew)
     Gskew = Lskew[:,1:rskew]
-    Gskew = Qskew*Gskew
-    println("error: ",norm(A-(1/2)*Gsym*Gsym'-Gskew*Gskew'))    
+#    Gskew = Qskew*Gskew
+    Ar = FullPerfShuff(Gsym*Gsym',Gskew*Gskew',n)
+    println("error: ",norm(A-Ar))
 end
 
 function Qnn(n)
@@ -543,7 +547,7 @@ function lapack_chol(A,tol=1e-6)
     return A[:,1:rank]
 end
 
-function FullPerfShuff(B,C)
+function FullPerfShuff4(B,C)
     Qsym,Qskew = Qnn(n)
     X = Qsym*B*Qsym'
     Y = Qskew*C*Qskew'
