@@ -4,7 +4,7 @@ function SizeRankVersusSpeedup()
     # ratio of L,piv,rank = UnStructPerfShuff(A) time divided
     # by Lsym,psym,rsym,Lskew,pskew,rskew = StructPerfShuff(A) time    
     tol = 1e-6
-    trials = 2#10
+    trials = 10
     num_ranks = 2
     n_range = [39, 55, 67, 77]
     unstruct_times = zeros(length(n_range),num_ranks)
